@@ -25,7 +25,7 @@ outputs
 .DS_Store
 
 # VS Code
-.vscode
+#.vscode
 
 # HPC
 nautilus/*.yaml
