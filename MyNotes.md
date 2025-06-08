@@ -52,9 +52,7 @@ python lerobot/scripts/control_robot.py \
 
 # Upload fine tuned model to Hugging face
 
-CKPT=last
-huggingface-cli upload ${HF_USER}/act_so101_test${CKPT} \
-  outputs/train/act_so101_test/checkpoints/${CKPT}/pretrained_model
+huggingface-cli upload fbeltrao/pi0fast_so101_unplug_cable outputs/train/s101_unplug_cable_4_1000steps/checkpoints/last/pretrained_model/ --revision v1000steps
 
 
 # Hugging face login
