@@ -119,10 +119,17 @@ class PolicyClient:
 
 
 
+def move_to_start_position(robot: Robot):
+    # Move the robot to a predefined start position
+    # This is a placeholder function, you should implement the actual logic to move the robot
+    print("Moving robot to start position...")
+    robot.send_action(torch.tensor([10.0,82.0,75.0,83.0,3.0,-0.0], dtype=torch.float32, device="cpu"))  # Example action, adjust as needed
+    busy_wait(1)
 
 
 def remote_inference_control(prompt: str):
     robot = connect_robot()
+    move_to_start_position(robot)
 
     policy = PolicyClient("http://localhost:8000")  # Adjust the URL to your API endpoint
 
@@ -131,10 +138,7 @@ def remote_inference_control(prompt: str):
         print("Capturing observation...")
         obs = robot.capture_observation()
 
-        print("Local observation:", generate_local_inference_obs(obs, prompt))
-
         obs["task"] = [prompt]
-
         actions = policy.select_action(obs)
 
         for action in actions:
@@ -159,7 +163,7 @@ def generate_local_inference_obs(obs: dict[str, Any], prompt: str) -> dict[str, 
 
 def local_inference_control(prompt: str):
     robot = connect_robot()
-
+    move_to_start_position(robot)
     policy = create_local_policy()
 
     while True:

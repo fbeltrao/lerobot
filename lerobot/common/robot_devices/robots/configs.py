@@ -485,12 +485,12 @@ class So101RobotConfig(ManipulatorRobotConfig):
             #     height=480,
             # ),            
             "wrist": OpenCVCameraConfig(
-                camera_index=4,
+                camera_index=0,
                 fps=30,
                 width=640,
                 height=480,
             ),
-            "front": OpenCVCameraConfig(
+            "side": OpenCVCameraConfig(
                 camera_index=6,
                 fps=30,
                 width=640,
