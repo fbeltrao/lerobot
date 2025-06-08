@@ -30,6 +30,52 @@
             ],
             "jinja": true,
             "justMyCode": false,
-        }
+        },
+        {
+            "name": "Fine-tune [CPU] pizero-fast",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/lerobot/scripts/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                // "--policy.path",
+                // "lerobot/pi0fast_base",
+                "--policy.type",
+                "pi0fast",
+                "--dataset.repo_id",
+                "fbeltrao/so101_unplug_cable_4",
+                "--policy.device",
+                "cpu",
+                "--steps",
+                "1",
+                "--output_dir",
+                "outputs/train/debug",
+                "--job_name",
+                "debug"
+            ]
+        },
+        {
+            "name": "Fine-tune pizero-fast",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/lerobot/scripts/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                // "--policy.path",
+                // "lerobot/pi0fast_base",
+                "--policy.type",
+                "pi0fast",
+                "--dataset.repo_id",
+                "fbeltrao/so101_unplug_cable_4",
+                "--steps",
+                "1",
+                "--output_dir",
+                "outputs/train/debug",
+                "--job_name",
+                "debug"
+            ]
+        },
     ]
 }
