@@ -47,7 +47,7 @@ from lerobot.common.utils.utils import (
     has_method,
     init_logging,
 )
-from lerobot.common.utils.wandb_utils import WandBLogger
+from lerobot.common.utils.wandb_utils import ExperimentLogger, MLFlowLogger, WandBLogger
 from lerobot.configs import parser
 from lerobot.configs.train import TrainPipelineConfig
 from lerobot.scripts.eval import eval_policy
@@ -110,12 +110,19 @@ def train(cfg: TrainPipelineConfig):
     cfg.validate()
     logging.info(pformat(cfg.to_dict()))
 
+    exp_logger: ExperimentLogger | None = None
     if cfg.wandb.enable and cfg.wandb.project:
-        wandb_logger = WandBLogger(cfg)
+        exp_logger = WandBLogger(cfg)
+    elif True:  # TODO make MLflow a configuration option
+        exp_logger = MLFlowLogger(cfg)
     else:
-        wandb_logger = None
         logging.info(colored("Logs will be saved locally.", "yellow", attrs=["bold"]))
 
+    with exp_logger or nullcontext():
+        _train(cfg, exp_logger)
+
+
+def _train(cfg: TrainPipelineConfig, exp_logger: ExperimentLogger | None = None):
     if cfg.seed is not None:
         set_seed(cfg.seed)
 
@@ -230,11 +237,11 @@ def train(cfg: TrainPipelineConfig):
 
         if is_log_step:
             logging.info(train_tracker)
-            if wandb_logger:
-                wandb_log_dict = train_tracker.to_dict()
+            if exp_logger:
+                log_dict = train_tracker.to_dict()
                 if output_dict:
-                    wandb_log_dict.update(output_dict)
-                wandb_logger.log_dict(wandb_log_dict, step)
+                    log_dict.update(output_dict)
+                exp_logger.log_dict(log_dict, step)
             train_tracker.reset_averages()
 
         if cfg.save_checkpoint and is_saving_step:
@@ -242,8 +249,8 @@ def train(cfg: TrainPipelineConfig):
             checkpoint_dir = get_step_checkpoint_dir(cfg.output_dir, cfg.steps, step)
             save_checkpoint(checkpoint_dir, step, cfg, policy, optimizer, lr_scheduler)
             update_last_checkpoint(checkpoint_dir)
-            if wandb_logger:
-                wandb_logger.log_policy(checkpoint_dir)
+            if exp_logger:
+                exp_logger.log_policy(checkpoint_dir)
 
         if cfg.env and is_eval_step:
             step_id = get_step_identifier(step, cfg.steps)
@@ -273,10 +280,10 @@ def train(cfg: TrainPipelineConfig):
             eval_tracker.avg_sum_reward = eval_info["aggregated"].pop("avg_sum_reward")
             eval_tracker.pc_success = eval_info["aggregated"].pop("pc_success")
             logging.info(eval_tracker)
-            if wandb_logger:
-                wandb_log_dict = {**eval_tracker.to_dict(), **eval_info}
-                wandb_logger.log_dict(wandb_log_dict, step, mode="eval")
-                wandb_logger.log_video(eval_info["video_paths"][0], step, mode="eval")
+            if exp_logger:
+                log_dict = {**eval_tracker.to_dict(), **eval_info}
+                exp_logger.log_dict(log_dict, step, mode="eval")
+                exp_logger.log_video(eval_info["video_paths"][0], step, mode="eval")
 
     if eval_env:
         eval_env.close()

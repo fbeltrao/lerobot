@@ -18,11 +18,15 @@ import os
 import re
 from glob import glob
 from pathlib import Path
+from types import TracebackType
+from typing import Optional, Protocol, Type
 
 from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
+import mlflow
 from termcolor import colored
 
 from lerobot.common.constants import PRETRAINED_MODEL_DIR
+from lerobot.common.utils.logging_utils import MetricsTracker
 from lerobot.configs.train import TrainPipelineConfig
 
 
@@ -56,7 +60,100 @@ def get_safe_wandb_artifact_name(name: str):
     return name.replace(":", "_").replace("/", "_")
 
 
-class WandBLogger:
+class ExperimentLogger(Protocol):
+    """A protocol for logging experiments."""
+
+    def log_policy(self, checkpoint_dir: Path):
+        """Checkpoints the policy to the logger."""
+        ...
+
+    def log_dict(self, d: dict, step: int, mode: str = "train"):
+        """Logs a dictionary of values."""
+        ...
+
+    def log_video(self, video_path: str, step: int, mode: str = "train"):
+        """Logs a video."""
+        ...
+
+    def log_metrics(self, metrics: MetricsTracker):
+        """Logs a MetricsTracker object."""
+        ...
+
+    def __enter__(self) -> "ExperimentLogger": ...
+
+    def __exit__(
+        self,
+        __exc_type: Optional[Type[BaseException]],
+        __exc_value: Optional[BaseException],
+        __traceback: Optional[TracebackType],
+    ) -> None: ...
+
+
+class MLFlowLogger(ExperimentLogger):
+    """A helper class to log object using MLFlow."""
+
+    def __init__(self, cfg: TrainPipelineConfig):
+        import mlflow
+
+        self.cfg = cfg
+        run_tags = {
+            "policy": cfg.policy.type,
+            "dataset": cfg.dataset.repo_id,
+            "seed": str(cfg.seed) if cfg.seed else "not_set",
+            "env": cfg.env.type if cfg.env else "none",
+        }
+
+        self._run = mlflow.start_run(
+            run_name=cfg.job_name,
+            # experiment_id=cfg.wandb.project or cfg.wandb.entity or "train_eval",
+            tags=run_tags,
+            nested=True,  # Allows nested runs
+        )
+
+        mlflow.log_params(cfg.to_dict())
+
+    def log_policy(self, checkpoint_dir: Path):
+        """Checkpoints the policy to MLFlow."""
+        mlflow.log_artifact(local_path=checkpoint_dir / PRETRAINED_MODEL_DIR / SAFETENSORS_SINGLE_FILE)
+
+    def log_dict(self, d: dict, step: int, mode: str = "train"):
+        """Logs a dictionary of values to MLFlow."""
+        if mode not in {"train", "eval"}:
+            raise ValueError(mode)
+
+        mlflow.log_dict(dict)
+
+    def log_video(self, video_path: str, step: int, mode: str = "train"):
+        """Logs a video to MLFlow."""
+
+        if mode not in {"train", "eval"}:
+            raise ValueError(mode)
+
+        mlflow.log_artifact(video_path)
+
+    def log_metrics(self, metrics: MetricsTracker):
+        """Logs a MetricsTracker object to MLFlow."""
+
+        # Log each metric in the MetricsTracker.
+        for key, value in metrics.to_dict().items():
+            mlflow.log_metric(key, value, step=metrics.steps)
+
+    def __enter__(self) -> "MLFlowLogger":
+        """Enter the context manager."""
+        return self
+
+    def __exit__(
+        self,
+        __exc_type: Optional[Type[BaseException]],
+        __exc_value: Optional[BaseException],
+        __traceback: Optional[TracebackType],
+    ) -> None:
+        """Exit the context manager and end the MLFlow run."""
+        if self._run:
+            self._run.__exit__(__exc_type, __exc_value, __traceback)
+
+
+class WandBLogger(ExperimentLogger):
     """A helper class to log object using wandb."""
 
     def __init__(self, cfg: TrainPipelineConfig):
@@ -77,7 +174,7 @@ class WandBLogger:
             if cfg.resume
             else None
         )
-        wandb.init(
+        self._run = wandb.init(
             id=wandb_run_id,
             project=self.cfg.project,
             entity=self.cfg.entity,
@@ -161,3 +258,19 @@ class WandBLogger:
 
         wandb_video = self._wandb.Video(video_path, fps=self.env_fps, format="mp4")
         self._wandb.log({f"{mode}/video": wandb_video}, step=step)
+
+    def log_metrics(self, metrics: MetricsTracker):
+        pass
+
+    def __enter__(self) -> "WandBLogger":
+        return self
+
+    def __exit__(
+        self,
+        __exc_type: Optional[Type[BaseException]],
+        __exc_value: Optional[BaseException],
+        __traceback: Optional[TracebackType],
+    ) -> None:
+        # Finish the WandB run.
+        if self._run:
+            self._run.__exit__(__exc_type, __exc_value, __traceback)
