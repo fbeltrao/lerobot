@@ -109,10 +109,13 @@ async def load_model():
     global policy, processor
     print("Loading policy model... This may take a while.")
 
-    pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable_5000_steps"
-    policy_config = PreTrainedConfig.from_pretrained(pretrained_name_or_path=pretrained_name_or_path)
+    pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable"
+    revision = "v1000steps"
+    policy_config = PreTrainedConfig.from_pretrained(
+        pretrained_name_or_path=pretrained_name_or_path, revision=revision
+    )
     # policy_config.device = "cpu"  # Force CPU for compatibility
-    policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, config=policy_config)
+    policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, revision=revision, config=policy_config)
     policy.eval()
 
     processor = process_policy  # Assign the processing function
