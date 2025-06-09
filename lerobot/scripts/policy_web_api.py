@@ -109,8 +109,8 @@ async def load_model():
     global policy, processor
     print("Loading policy model... This may take a while.")
 
-    pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable"
-    revision = "v1000steps"
+    pretrained_name_or_path = "fbeltrao/so101_unplug_cable_4"
+    revision = "steps_10_000"
     policy_config = PreTrainedConfig.from_pretrained(
         pretrained_name_or_path=pretrained_name_or_path, revision=revision
     )
