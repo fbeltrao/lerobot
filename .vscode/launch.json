@@ -69,12 +69,38 @@
                 "pi0fast",
                 "--dataset.repo_id",
                 "fbeltrao/so101_unplug_cable_4",
-                "--steps",
+                "--log_freq",
                 "1",
+                "--steps",
+                "2",
                 "--output_dir",
                 "outputs/train/debug",
                 "--job_name",
                 "debug"
+            ],
+            "env": {
+                "MLFLOW_TRACKING_URI": "http://localhost:5000",
+                "MLFLOW_EXPERIMENT_NAME": "lerobot",
+            }
+        },
+        {
+            "name": "AML job",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/aml/submit_job.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--policy.type",
+                "pi0fast",
+                "--dataset.repo_id",
+                "fbeltrao/so101_unplug_cable_4",
+                "--steps",
+                "10",
+                "--job_name",
+                "aml_debug",
+                "--compute_target",
+                "NC24adsA100v4-singlenode-cluster",
             ]
         },
     ]
