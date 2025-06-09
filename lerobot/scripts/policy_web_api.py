@@ -8,6 +8,7 @@
 # pip install fastapi uvicorn transformers==4.48.1 pydantic pillow
 import base64
 import io
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -20,6 +21,8 @@ from pydantic import BaseModel
 
 from lerobot.common.policies.pi0fast.modeling_pi0fast import PI0FASTPolicy
 from lerobot.common.policies.pretrained import PreTrainedPolicy
+from lerobot.common.robot_devices.control_utils import predict_action
+from lerobot.common.utils.utils import get_safe_torch_device
 from lerobot.configs.policies import PreTrainedConfig
 
 # Initialize FastAPI app
@@ -58,17 +61,28 @@ policy: PreTrainedPolicy | None = None
 processor: Callable[[ObservationRequest], list[torch.Tensor]] | None = None
 
 
-def image_to_tensor(image_base64: str) -> torch.Tensor:
-    image_array: np.ndarray | None = None
+def tensor_from_image_base64(name: str, image_base64: str, *, store_image: bool = False) -> torch.Tensor:
+    """Convert a base64 encoded image to a PyTorch tensor"""
     with io.BytesIO(base64.b64decode(image_base64)) as buffer:
         pil_img = Image.open(buffer).convert("RGB")
-        image_array = np.array(pil_img)
+        if store_image:
+            debug_folder = Path("outputs") / "predictions" / "input"
+            debug_folder.mkdir(parents=True, exist_ok=True)
+            pil_img.save(debug_folder / f"{name}.png")  # Save the image for debugging
+        return torch.from_numpy(np.array(pil_img))
 
-    img = torch.from_numpy(image_array)
 
-    v = img.type(torch.float32) / 255
-    result = v.permute(2, 0, 1).unsqueeze(0)
-    return result
+# def image_to_tensor(image_base64: str) -> torch.Tensor:
+#     image_array: np.ndarray | None = None
+#     with io.BytesIO(base64.b64decode(image_base64)) as buffer:
+#         pil_img = Image.open(buffer).convert("RGB")
+#         image_array = np.array(pil_img)
+
+#     img = torch.from_numpy(image_array)
+
+#     v = img.type(torch.float32) / 255
+#     result = v.permute(2, 0, 1).unsqueeze(0)
+#     return result
 
 
 OBS_STATE_KEY = "observation.state"
@@ -81,24 +95,32 @@ def process_policy(request: ObservationRequest) -> list[list[float]]:
         raise HTTPException(status_code=503, detail="Policy model not loaded yet")
 
     obs = {
-        OBS_STATE_KEY: torch.tensor(request.state, dtype=torch.float32).unsqueeze(0).to(policy.config.device),
+        OBS_STATE_KEY: torch.tensor(request.state, dtype=torch.float32),
         "task": request.task,
+        "robot_type": [policy.robot_type] if hasattr(policy, "robot_type") else [""],
     }
 
     for img_name, image_value in request.images.items():
-        image_as_tensor = image_to_tensor(image_value)
-        obs[img_name] = image_as_tensor.to(policy.config.device)
+        obs[img_name] = tensor_from_image_base64(img_name, image_value, store_image=True)
 
-    actions: list[list[float]] = []
-    with torch.no_grad():
-        print(f"Running policy with state {obs}...")
-        action = policy.select_action(obs)
-        actions.append(action.cpu().numpy()[0].tolist())
-        if "_action_queue" in policy.__dict__:
-            # If the policy has an action queue, we need to pop the first action
-            while len(policy._action_queue) > 0:
-                action = policy._action_queue.popleft()
-                actions.append(action.cpu().numpy()[0].tolist())
+    predicted = predict_action(
+        obs, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
+    )
+
+    # Convert the predicted actions to a list of lists
+    actions = []
+    actions.append(predicted.cpu().numpy().tolist())
+
+    # actions: list[list[float]] = []
+    # with torch.no_grad():
+    #     print(f"Running policy with state {obs}...")
+    #     action = policy.select_action(obs)
+    #     actions.append(action.cpu().numpy()[0].tolist())
+    #     if "_action_queue" in policy.__dict__:
+    #         # If the policy has an action queue, we need to pop the first action
+    #         while len(policy._action_queue) > 0:
+    #             action = policy._action_queue.popleft()
+    #             actions.append(action.cpu().numpy()[0].tolist())
 
     return actions
 
@@ -117,6 +139,7 @@ async def load_model():
     # policy_config.device = "cpu"  # Force CPU for compatibility
     policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, revision=revision, config=policy_config)
     policy.eval()
+    policy.reset()
 
     processor = process_policy  # Assign the processing function
 
