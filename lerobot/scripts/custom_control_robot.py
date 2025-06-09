@@ -123,15 +123,18 @@ def move_to_start_position(robot: Robot):
     # Move the robot to a predefined start position
     # This is a placeholder function, you should implement the actual logic to move the robot
     print("Moving robot to start position...")
-    robot.send_action(torch.tensor([10.0,82.0,75.0,83.0,3.0,-0.0], dtype=torch.float32, device="cpu"))  # Example action, adjust as needed
-    busy_wait(1)
+    start_position = [10.0,82.0,75.0,83.0,3.0,-0.0]
+    start_position = [2.64,193.62,172.18,79.54,-6.33,0.14]
+    robot.send_action(torch.tensor(start_position, dtype=torch.float32, device="cpu"))  # Example action, adjust as needed
+    busy_wait(2)
+    print("Robot moved to start position.")
 
 
 def remote_inference_control(prompt: str):
     robot = connect_robot()
     move_to_start_position(robot)
 
-    policy = PolicyClient("http://localhost:8000")  # Adjust the URL to your API endpoint
+    policy = PolicyClient("http://192.168.0.127:8000")  # Adjust the URL to your API endpoint
 
     while True:
 
