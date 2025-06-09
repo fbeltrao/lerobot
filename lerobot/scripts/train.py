@@ -238,10 +238,7 @@ def _train(cfg: TrainPipelineConfig, exp_logger: ExperimentLogger | None = None)
         if is_log_step:
             logging.info(train_tracker)
             if exp_logger:
-                log_dict = train_tracker.to_dict()
-                if output_dict:
-                    log_dict.update(output_dict)
-                exp_logger.log_dict(log_dict, step)
+                exp_logger.log_metrics(train_tracker)
             train_tracker.reset_averages()
 
         if cfg.save_checkpoint and is_saving_step:

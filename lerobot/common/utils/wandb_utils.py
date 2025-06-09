@@ -21,8 +21,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import Optional, Protocol, Type
 
-from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
 import mlflow
+from huggingface_hub.constants import SAFETENSORS_SINGLE_FILE
 from termcolor import colored
 
 from lerobot.common.constants import PRETRAINED_MODEL_DIR
@@ -225,7 +225,8 @@ class WandBLogger(ExperimentLogger):
         self._wandb.log({f"{mode}/video": wandb_video}, step=step)
 
     def log_metrics(self, metrics: MetricsTracker):
-        pass
+        log_dict = metrics.to_dict()
+        self.log_dict(log_dict, step=metrics.steps)
 
     def __enter__(self) -> "WandBLogger":
         return self
