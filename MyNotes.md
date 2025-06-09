@@ -42,7 +42,7 @@ python lerobot/scripts/control_robot.py \
   --robot.type=so101 \
   --control.type=replay \
   --control.fps=30 \
-  --control.repo_id=fbeltrao/so101_unplug_cable_3 \
+  --control.repo_id=fbeltrao/so101_unplug_cable_4 \
   --control.episode=1
 
 
