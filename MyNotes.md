@@ -67,4 +67,11 @@ huggingface-cli upload fbeltrao/so101_unplug_cable_4 . --repo-type=dataset
 
 # Train
 
+git clone https://github.com/fbeltrao/lerobot
+cd lerobot
+conda activate lerobot
+git checkout francisco/s101-pi0
+pip install azureml-mlflow
+pip install mlflow
+
 python lerobot/scripts/train.py --policy.type pi0fast --dataset.repo_id fbeltrao/so101_unplug_cable_4 --log_freq 50 --eval_freq 100 --steps 5000 --output_dir outputs/train/so101_unplug_cable_4_5000steps --job_name so101_unplug_cable_4_5000steps
