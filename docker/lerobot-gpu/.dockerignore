@@ -1,0 +1,9 @@
+outputs
+.git
+.github
+.gitignore
+.gitlab-ci.yml
+.vscode
+__pycache__
+.env
+venv

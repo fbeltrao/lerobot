@@ -12,7 +12,7 @@ from PIL import Image
 from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.common.policies.pi0fast.modeling_pi0fast import PI0FASTPolicy
 from lerobot.common.policies.pretrained import PreTrainedPolicy
-from lerobot.common.robot_devices.control_utils import predict_action
+from lerobot.common.utils.control_utils import predict_action
 from lerobot.common.utils.utils import get_safe_torch_device
 
 
@@ -28,9 +28,16 @@ def save_image(image_path: Path, image_tensor: torch.tensor):
     image.save(image_path)
 
 
-def extract_observations(dataset_name: str, output_path: Path, number_of_frames: int = 20):
+def extract_observations(
+    dataset_name: str,
+    output_path: Path,
+    number_of_frames: int = 20,
+    frames_to_extract: list[int] | None = None,
+):
     dataset = LeRobotDataset(dataset_name)
-    frames_to_extract = [random.randint(0, dataset.num_frames - 1) for _ in range(number_of_frames)]
+    frames_to_extract = frames_to_extract or [
+        random.randint(0, dataset.num_frames - 1) for _ in range(number_of_frames)
+    ]
 
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -83,13 +90,11 @@ def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTra
     torch_device = get_safe_torch_device(policy.config.device)
     for observation in observations:
         obs = observation.copy()
+        task = obs.pop("task", None)
         obs.pop("action", None)
         obs.pop("index", None)
         obs.pop("episode_index", None)
         obs.pop("images", None)
-
-        if not isinstance(obs["task"], list):
-            obs["task"] = [obs["task"]]
 
         # clear cached actions
         if "_action_queue" in policy.__dict__:
@@ -101,6 +106,7 @@ def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTra
             policy,
             torch_device,
             policy.config.use_amp,
+            task=task,
         )
         prediction_duration = datetime.datetime.now() - prediction_start
         expected: list[float] = observation["action"]
@@ -140,9 +146,19 @@ def load_observation_image(image_path: str) -> torch.Tensor:
     return torch.from_numpy(np.array(pil_img))
 
 
-def load_observations(output_path: Path) -> Iterable[dict]:
+def load_observations(
+    output_path: Path,
+    frames: list[int] | None = None,
+) -> Iterable[dict]:
     """Load observations from the output path."""
+
     for observation_file in output_path.glob("*.json"):
+        if frames is not None:
+            # If specific frames are requested, check if the file matches
+            index = int(observation_file.stem.split("_", maxsplit=1)[0])
+            if index not in frames:
+                continue
+
         with open(observation_file, "r") as f:
             observation = json.load(f)
             # Convert state to tensor
@@ -163,6 +179,11 @@ def main():
     # - Load dataset metadata
     dataset_name = "fbeltrao/so101_unplug_cable_4"
     output_path = Path("outputs") / "extracted_observations" / dataset_name
+
+    frames: list[int] | None = None
+    # frames = [8435]
+    extract_observations(dataset_name, output_path=output_path, frames_to_extract=frames)
+
     if not output_path.exists():
         extract_observations(dataset_name, output_path=output_path, number_of_frames=20)
 
@@ -174,7 +195,13 @@ def main():
     policy.eval()
     policy.to(device)
 
-    evaluate_observations_on_policy(load_observations(output_path), policy)
+    evaluate_observations_on_policy(
+        load_observations(
+            output_path,
+            frames,
+        ),
+        policy,
+    )
 
 
 if __name__ == "__main__":
