@@ -1,40 +1,15 @@
-# Copyright 2024 The HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""This script demonstrates how to slice a dataset and calculate the loss on a subset of the data.
-
-This technique can be useful for debugging and testing purposes, as well as identifying whether a policy
-is learning effectively.
-
-Furthermore, relying on validation loss to evaluate performance is generally not considered a good practice,
-especially in the context of imitation learning. The most reliable approach is to evaluate the policy directly
-on the target environment, whether that be in simulation or the real world.
-"""
-
 import datetime
 import json
-import math
-import os
 import random
 from pathlib import Path
 from typing import Iterable, TypedDict
 
 import numpy as np
+import pandas as pd
 import torch
 from PIL import Image
 
-from lerobot.common.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
+from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.common.policies.pi0fast.modeling_pi0fast import PI0FASTPolicy
 from lerobot.common.policies.pretrained import PreTrainedPolicy
 from lerobot.common.robot_devices.control_utils import predict_action
@@ -89,11 +64,23 @@ def extract_observations(dataset_name: str, output_path: Path, number_of_frames:
         print(f"Observation at frame {frame}: {observation}")
 
 
+class PredictionRecord(TypedDict):
+    """A record of a prediction made by the policy."""
+
+    episode_index: int
+    index: int
+    action: list[float]
+    expected_action: list[float]
+    mse_loss: float
+    prediction_duration_ms: float
+
+
 def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTrainedPolicy):
     """Evaluate a list of observations on a given policy."""
 
-    torch_device = get_safe_torch_device(policy.config.device)
+    prediction_records: list[PredictionRecord] = []
 
+    torch_device = get_safe_torch_device(policy.config.device)
     for observation in observations:
         obs = observation.copy()
         obs.pop("action", None)
@@ -124,14 +111,28 @@ def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTra
             torch.tensor(predicted, dtype=torch.float32), torch.tensor(expected, dtype=torch.float32)
         ).item()
 
-        print(
-            "==============================================================================================="
+        prediction_records.append(
+            {
+                "episode_index": observation["episode_index"],
+                "index": observation["index"],
+                "action": predicted,
+                "expected_action": expected,
+                "mse_loss": mse_loss,
+                "prediction_duration_ms": prediction_duration.total_seconds()
+                * 1000,  # Convert to milliseconds
+            }
         )
-        print(f"    Episode: {observation['episode_index']}, Frame: {observation['index']}")
-        print(f"    MSE Loss: {mse_loss:.6f}")
-        print(f"    Expected: {expected}")
-        print(f"    Predicted: {predicted}")
-        print(f"    Prediction Duration: {prediction_duration.total_seconds() * 1000:.2f}ms")
+
+    # Save the prediction records to a CSV file
+    df_results = pd.DataFrame(prediction_records)
+    output_folder = Path("outputs") / "model_evaluation" / "pi0fast"
+    output_folder.mkdir(parents=True, exist_ok=True)
+    df_results.to_csv(
+        output_folder / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_predictions.csv",
+        index=False,
+    )
+
+    print(df_results)
 
 
 def load_observation_image(image_path: str) -> torch.Tensor:
