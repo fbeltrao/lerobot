@@ -1,0 +1,23 @@
+robot:
+  type: so101_follower
+  port: /dev/ttyACM0
+  id: s101_follower_v2
+  calibration_dir: .cache/calibration/so101/
+  cameras:
+    wrist:
+      type: opencv
+      index_or_path: 4
+      width: 640
+      height: 480
+      fps: 30
+    side:
+      type: opencv
+      index_or_path: 6
+      width: 640
+      height: 480
+      fps: 30
+teleop:
+  type: so101_leader
+  port: /dev/ttyACM1
+  id: s101_leader_v2
+  calibration_dir: .cache/calibration/so101/
