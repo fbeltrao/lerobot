@@ -33,29 +33,22 @@ python -m lerobot.teleoperate --config_path ./robot_config.yaml --display_data t
 
 
 python -m lerobot.record \
-    --config_path ./robot_config.yaml
-    --display_data=false \
-    --dataset.repo_id=fbeltrao/record-test \
-    --dataset.num_episodes=2 \
-    --dataset.single_task="Grab the cable"
-
-python -m lerobot.record \
     --config_path ./robot_config.yaml \
     --dataset.fps 30 \
-    --dataset.single_task "Pick up the cable." \
-    --dataset.repo_id fbeltrao/so101_unplug_cable_test \
-    --dataset.tags '["so101","unplug cable"]' \
-    --dataset.episode_time_s 20 \
-    --dataset.reset_time_s 30 \
-    --dataset.num_episodes 2 \
+    --dataset.single_task "Pick up the lego brick." \
+    --dataset.repo_id fbeltrao/so101_multi_task \
+    --dataset.tags '["so101","unplug cable", "lego"]' \
+    --dataset.episode_time_s 60 \
+    --dataset.reset_time_s 60 \
+    --dataset.num_episodes 10 \
     --play_sounds true \
-    --control.resume true \
+    --resume true \
     --dataset.push_to_hub false \
     --control.display_data true
 
 ## Visualize
 
-python lerobot/scripts/visualize_dataset_html.py --repo-id fbeltrao/so101_unplug_cable_4
+python lerobot/scripts/visualize_dataset_html.py --repo-id fbeltrao/so101_multi_task
 
 ## Replay
 
@@ -65,6 +58,21 @@ python lerobot/scripts/control_robot.py \
   --control.fps=30 \
   --control.repo_id=fbeltrao/so101_unplug_cable_4 \
   --control.episode=1
+
+
+
+python -m lerobot.replay \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM0 \
+    --robot.id=s101_follower_v2 \
+    --dataset.repo_id=fbeltrao/so101_multi_task \
+    --dataset.episode=0
+
+python -m lerobot.replay \
+    --config_path ./robot_config.yaml \
+    --dataset.repo_id fbeltrao/so101_multi_task \
+    --dataset.episode 0 \
+    --robot.cameras "{}"
 
 ## Episodes to remove
 

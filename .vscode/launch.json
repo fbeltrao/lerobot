@@ -13,6 +13,18 @@
             "justMyCode": false
         },
         {
+            "name": "Teleoperate",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lerobot.teleoperate",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--config_path",
+                "${workspaceFolder}/robot_config.yaml"
+            ]
+        },
+        {
             "name": "Launch custom robot action",
             "type": "debugpy",
             "request": "launch",
