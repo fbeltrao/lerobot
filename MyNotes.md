@@ -74,28 +74,49 @@ python -m lerobot.replay \
     --dataset.episode 0 \
     --robot.cameras "{}"
 
-## Episodes to remove
-
-## Upload fine tuned model to Hugging face
-
-huggingface-cli upload fbeltrao/pi0fast_so101_unplug_cable outputs/train/s101_unplug_cable_4_1000steps/checkpoints/last/pretrained_model/ --revision v1000steps
-
 ## Hugging face login
 
 huggingface-cli login
 
 ## Upload dataset from cli
 
-huggingface-cli upload fbeltrao/so101_unplug_cable_4 . --repo-type=dataset --revision steps_10_000
+huggingface-cli upload fbeltrao/so101_multi_task . --repo-type=dataset --revision steps_10_000
 
-## Train
+## Train on Azure ML compute instance
 
+### First time installation
+
+```plain
 git clone https://github.com/fbeltrao/lerobot
-cd lerobot && \
-  conda activate lerobot && \
-  git checkout francisco/s101-pi0
+cd lerobot
+conda install ffmpeg=7.1.1 -c conda-forge
+conda activate lerobot
+
+git checkout francisco/s101-pi0
+pip install -e ".[pi0]"
+pip install transformers==4.48.1
 pip install azureml-mlflow
+```
 
+### Once per login
+
+Set training properties
+
+```plain
+export DATASET=so101_multi_task
+export HF_USER=fbeltrao
+export STEPS=5000
+export POLICY_TYPE=pi0fast
+```
+
+```plain
+git clone https://github.com/fbeltrao/lerobot
+cd lerobot
+conda activate lerobot
 az login -t <tenant> --client-id "<principal-id>"
+python lerobot/scripts/train.py --policy.type $POLICY_TYPE --dataset.repo_id "${HF_USER}/${DATASET}" --log_freq 100 --eval_freq 200 --steps $STEPS --output_dir ""/home/azureuser/cloudfiles/data/outputs/train/${DATASET}_${STEPS}steps" --job_name "${DATASET}_${STEPS}steps"
+```
 
-python lerobot/scripts/train.py --policy.type pi0fast --dataset.repo_id fbeltrao/so101_unplug_cable_4 --log_freq 100 --eval_freq 200 --steps 10000 --output_dir outputs/train/so101_unplug_cable_4_10000steps --job_name so101_unplug_cable_4_10000steps
+### Upload fine tuned model to Hugging face
+
+huggingface-cli upload "${HF_USER}/${POLICY_TYPE}_${DATASET}" "/home/azureuser/cloudfiles/data/outputs/train/${DATASET}_${STEPS}steps/checkpoints/last/pretrained_model/" --revision "v${STEPS}steps"
