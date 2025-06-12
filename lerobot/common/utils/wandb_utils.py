@@ -110,7 +110,7 @@ class MLFlowLogger(ExperimentLogger):
             nested=True,  # Allows nested runs
         )
 
-        mlflow.log_params(cfg.to_dict())
+        # mlflow.log_params(cfg.to_dict())
 
     def log_policy(self, checkpoint_dir: Path):
         """Checkpoints the policy to MLFlow."""
