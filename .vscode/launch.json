@@ -30,7 +30,11 @@
             "request": "launch",
             "program": "${workspaceFolder}/lerobot/scripts/custom_control_robot.py",
             "console": "integratedTerminal",
-            "justMyCode": false
+            "justMyCode": false,
+            "args": [
+                "--config_path",
+                "${workspaceFolder}/robot_config.yaml"
+            ]
         },
         {
             "name": "Launch policy server",
