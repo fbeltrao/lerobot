@@ -82,7 +82,7 @@ class PredictionRecord(TypedDict):
     prediction_duration_ms: float
 
 
-def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTrainedPolicy):
+def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTrainedPolicy) -> pd.DataFrame:
     """Evaluate a list of observations on a given policy."""
 
     prediction_records: list[PredictionRecord] = []
@@ -129,27 +129,19 @@ def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTra
             }
         )
 
-    # Save the prediction records to a CSV file
-    df_results = pd.DataFrame(prediction_records)
-    output_folder = Path("outputs") / "model_evaluation" / "pi0fast"
-    output_folder.mkdir(parents=True, exist_ok=True)
-    df_results.to_csv(
-        output_folder / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_predictions.csv",
-        index=False,
-    )
 
-    print(df_results)
+    return pd.DataFrame(prediction_records)
 
-
-def load_observation_image(image_path: str) -> torch.Tensor:
+def load_observation_image_to_numpy(image_path: str) -> np.array:
+    """Load an image from a file path and convert it to a numpy array."""
     pil_img = Image.open(image_path).convert("RGB")
-    return torch.from_numpy(np.array(pil_img))
+    return np.array(pil_img, dtype=np.uint8)
 
 
 def load_observations(
     output_path: Path,
     frames: list[int] | None = None,
-) -> Iterable[dict]:
+) -> Iterable[dict[str, np.ndarray]]:
     """Load observations from the output path."""
 
     for observation_file in output_path.glob("*.json"):
@@ -161,13 +153,11 @@ def load_observations(
 
         with open(observation_file, "r") as f:
             observation = json.load(f)
-            # Convert state to tensor
-            observation["observation.state"] = torch.tensor(observation["observation.state"]).type(
-                torch.float32
-            )
+            # Convert state to numpy array        
+            observation["observation.state"] = np.array(observation["observation.state"])
             # Convert images paths to tensors
             for k, v in observation["images"].items():
-                observation[k] = load_observation_image(v)
+                observation[k] = load_observation_image_to_numpy(v)
 
             yield observation
 
@@ -177,7 +167,7 @@ def main():
 
     # Load the last 10% of episodes of the dataset as a validation set.
     # - Load dataset metadata
-    dataset_name = "fbeltrao/so101_unplug_cable_4"
+    dataset_name = "fbeltrao/so101_multi_task"
     output_path = Path("outputs") / "extracted_observations" / dataset_name
 
     frames: list[int] | None = None
@@ -191,17 +181,30 @@ def main():
     pretrained_name_or_path = "fbeltrao/so101_unplug_cable_4"
     revision = "steps_10_000"
 
+    pretrained_name_or_path = "fbeltrao/pi0fast_so101_multi_task"
+    revision = "v5000steps"
+
     policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, revision=revision)
     policy.eval()
     policy.to(device)
 
-    evaluate_observations_on_policy(
+    df_results = evaluate_observations_on_policy(
         load_observations(
             output_path,
             frames,
         ),
         policy,
     )
+
+    output_folder = Path("outputs") / "model_evaluation" / "pi0fast" / pretrained_name_or_path / "dataset" / dataset_name
+    output_folder.mkdir(parents=True, exist_ok=True)
+    df_results.to_csv(
+        output_folder / f"{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_predictions.csv",
+        index=False,
+    )
+
+    print(df_results)
+
 
 
 if __name__ == "__main__":

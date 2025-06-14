@@ -1,50 +1,43 @@
  
 # Inspired by https://huggingface.co/yinchenghust/openpi_base
 
-from dataclasses import dataclass
+import base64
+import io
 import time
-from typing import Any
+from dataclasses import dataclass
+
 import draccus
+import numpy as np
 import requests
 import torch
-from lerobot.common.cameras.opencv.configuration_opencv import OpenCVCameraConfig # DO NOT REMOVE: required for the config parser
+from PIL import Image
+from requests.adapters import HTTPAdapter, Retry
+
+from lerobot.common.cameras import (  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
+    CameraConfig,
+)
+from lerobot.common.cameras.opencv import (  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
+    OpenCVCameraConfig,
+)
+from lerobot.common.cameras.opencv.configuration_opencv import (
+    OpenCVCameraConfig,  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
+)
 from lerobot.common.datasets.utils import build_dataset_frame, hw_to_dataset_features
 from lerobot.common.policies.pi0fast.modeling_pi0fast import PI0FASTPolicy
-from lerobot.common.policies.pi0.modeling_pi0 import PI0Policy
-
-from lerobot.common.utils.robot_utils import busy_wait
-from lerobot.configs.policies import PreTrainedConfig
-from lerobot.configs.types import FeatureType, PolicyFeature
-
-from lerobot.common.cameras import (  # noqa: F401
-   CameraConfig,
-    )
-
-
-from lerobot.common.cameras.opencv import (  # noqa: F401
-   OpenCVCameraConfig,
-    )
-
-
-from lerobot.common.robots import (  # noqa: F401
+from lerobot.common.robots import (  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
     Robot,
     RobotConfig,
     make_robot_from_config,
-    so101_follower
-    )
-
-
-from lerobot.common.teleoperators import (  # noqa: F401
-    TeleoperatorConfig,
-    so101_leader
+    so101_follower,
 )
-
-
-import base64
-import numpy as np
-import io
-from PIL import Image
-
+from lerobot.common.teleoperators import (  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
+    TeleoperatorConfig,
+    so101_leader,
+)
+from lerobot.common.utils.control_utils import predict_action
+from lerobot.common.utils.robot_utils import busy_wait
+from lerobot.common.utils.utils import get_safe_torch_device
+from lerobot.configs.policies import PreTrainedConfig
 
 ###################################################
 # Requires packages:
@@ -78,22 +71,12 @@ def create_local_policy() -> PI0FASTPolicy:
     pretrained_name_or_path = "sengi/pi0_so100_pretrain_500"
     pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable_10_stepslast"
     pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable_5000_steps"
-    policy_config = PreTrainedConfig.from_pretrained(pretrained_name_or_path=pretrained_name_or_path)
+    pretrained_name_or_path = "fbeltrao/pi0fast_so101_multi_task"
+    revision = "v5000steps"
+    policy_config = PreTrainedConfig.from_pretrained(pretrained_name_or_path=pretrained_name_or_path, revision=revision)
     policy_config.device="cpu"  # Force CPU for compatibility
-    # policy_config.device="cuda"  # Force CPU for compatibility
 
-    # Inspired from https://huggingface.co/datasets/yinchenghust/libero_rich_lang_all/blob/main/meta/info.json
-    # More info: https://github.com/huggingface/lerobot/issues/694
-
-    # # Reset features
-    # policy_config.input_features = {}
-    # policy_config.output_features = {}
-
-    # policy_config.input_features.update({ OBS_IMAGE_FRONT_KEY: PolicyFeature(FeatureType.VISUAL, shape=(480, 640, 3)) })
-    # policy_config.input_features.update({ OBS_IMAGE_WRIST_KEY: PolicyFeature(FeatureType.VISUAL, shape=(480, 640, 3)) })
-    # policy_config.output_features.update({ "action": PolicyFeature(FeatureType.ACTION, shape=(6,)) })  # Adjust shape as needed
-
-    policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, config=policy_config)
+    policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, config=policy_config, revision=revision)
     policy.eval()
     # # device = "cuda" if torch.cuda.is_available() else "cpu"
     device = "cpu"  # Force CPU for compatibility
@@ -101,15 +84,11 @@ def create_local_policy() -> PI0FASTPolicy:
     return policy
 
 
-
-
 def obs_to_image(img: torch.Tensor) -> torch.Tensor:
     v = img.type(torch.float32) / 255
     result = v.permute(2, 0, 1).unsqueeze(0)
     return result
 
-
-from requests.adapters import HTTPAdapter, Retry
 
 class PolicyClient:
     def __init__(self, api_url: str, robot: Robot):
@@ -120,6 +99,7 @@ class PolicyClient:
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
         self.robot = robot
         self.obs_features = hw_to_dataset_features(robot.observation_features, "observation")
+        self.robot_type = robot.robot_type
    
     def image_to_base64(self, img: np.ndarray) -> str:
         # img: np.ndarray with shape (480, 640, 3), dtype=np.uint8
@@ -140,6 +120,7 @@ class PolicyClient:
 
         predict_request["state"] = predict_request.pop(OBS_STATE_KEY, None)
         predict_request["task"] = obs.get("task", "")
+        predict_request["robot_type"] = self.robot_type or ""
         
         try:
             res = self.session.post(f"{self.api_url}/predict", json=predict_request, timeout=10)
@@ -190,6 +171,9 @@ def remote_inference_control(cfg: CustomControlConfig, prompt: str):
 
         print("Capturing observation...")
         obs = robot.get_observation()
+        # print only the positions
+        robot_position = { k: v for k, v in obs.items() if k.endswith(".pos") }
+        print(f"Robot position: {robot_position}")
         observation_frame = build_dataset_frame(obs_features, obs, prefix="observation")
 
         observation_frame["task"] = prompt
@@ -197,48 +181,61 @@ def remote_inference_control(cfg: CustomControlConfig, prompt: str):
 
         for action in actions:
             start_time = time.perf_counter()
-            print(f"Sending action: {action}") 
-            robot_action = {key: action[i] for i, key in enumerate(robot.action_features)}
+            robot_action = {key: action[i] for i, key in enumerate(robot.action_features)}               
+            print(f"Sending action to robot: {robot_action}")
             robot.send_action(robot_action)
             dt = time.perf_counter() - start_time
-            wait_seconds = 1 / 30 - dt
-            print(f"Will wait {wait_seconds:.4f} seconds")
-            busy_wait(wait_seconds)
-            print(f"Frame processed in {dt:.4f} seconds")
+            wait_seconds = max(1.0, 1 / 30 - dt)
+            print(f"Waiting {wait_seconds:.4f} seconds...")
+            busy_wait(wait_seconds)            
         busy_wait(1)
 
-
-def generate_local_inference_obs(obs: dict[str, Any], prompt: str) -> dict[str, Any]:
-    return {
-        OBS_IMAGE_FRONT_KEY: obs_to_image(obs[OBS_IMAGE_FRONT_KEY]),
-        OBS_IMAGE_WRIST_KEY: obs_to_image(obs[OBS_IMAGE_WRIST_KEY]),
-        OBS_STATE_KEY: obs[OBS_STATE_KEY].unsqueeze(0),
-        "task": [prompt]
-    }
-
-def local_inference_control(prompt: str):
-    robot = connect_robot()
+@draccus.wrap()
+def local_inference_control(cfg: CustomControlConfig, prompt: str):
+    robot = connect_robot(cfg.robot)
     move_to_start_position(robot)
     policy = create_local_policy()
-
+    torch_device = get_safe_torch_device(policy.config.device)
+    obs_features = hw_to_dataset_features(robot.observation_features, "observation")
     while True:
         start_time = time.perf_counter()
-        print("Capturing observation...")
-        obs = robot.get_observation()
-        obs_for_policy = generate_local_inference_obs(obs, prompt)
 
-        with torch.no_grad():
-            print(f"Running policy with state {obs_for_policy[OBS_STATE_KEY]}...")
-            action = policy.select_action(obs_for_policy)
-            action  = action.squeeze(0).cpu().numpy()
-        
-        print(f"Sending action: {action}")
-        robot.send_action(torch.tensor(action))
+        action_values: torch.Tensor
+
+        # Prevent getting observations if we already have the next action in queue
+        if "_action_queue" in policy.__dict__ and len(policy._action_queue) > 0:
+            print("Skipping observation capture, action already in queue...")
+            action_values = policy._action_queue.popleft().squeeze(0).to("cpu")
+        else:
+
+            print("Capturing observation...")
+            obs = robot.get_observation()
+
+            # print only the positions
+            robot_position = { k: v for k, v in obs.items() if k.endswith(".pos") }
+            print(f"Robot position: {robot_position}")
+
+            dataset_frame = build_dataset_frame(obs_features, obs, prefix="observation")
+                       
+            action_values = predict_action(
+                observation=dataset_frame, 
+                policy=policy, 
+                device=torch_device, 
+                use_amp=policy.config.use_amp,
+                task=prompt,
+                robot_type=robot.robot_type,
+            )
+
+        action = {key: action_values[i].item() for i, key in enumerate(robot.action_features)}
+            
+        print(f"Sending action to robot: {action}")
+        robot.send_action(action)
+
         dt = time.perf_counter() - start_time
-        wait_seconds = 1 / 30 - dt
-        print(f"Will wait {wait_seconds:.4f} seconds")
+        wait_seconds = max(1.0, 1 / 30 - dt)
+        print(f"Waiting {wait_seconds:.4f} seconds...")
         busy_wait(wait_seconds)
-        print(f"Frame processed in {dt:.4f} seconds")
+
 
 if __name__ == "__main__":
     print("Starting local inference control loop...")
