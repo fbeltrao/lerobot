@@ -120,3 +120,76 @@ python lerobot/scripts/train.py --policy.type $POLICY_TYPE --dataset.repo_id "${
 ### Upload fine tuned model to Hugging face
 
 huggingface-cli upload "${HF_USER}/${POLICY_TYPE}_${DATASET}" "/home/azureuser/cloudfiles/data/outputs/train/${DATASET}_${STEPS}steps/checkpoints/last/pretrained_model/" --revision "v${STEPS}steps"
+
+
+## Understanding the inferencing
+
+1. We first get observations from robot with `robot.get_observation()`
+
+Return is a position of each joint, and images as np.array with RGB values.
+```json
+{
+    'shoulder_pan.pos': -2.5246981339187613,
+    'shoulder_lift.pos': -98.8125530110263,
+    'elbow_flex.pos': 98.48282016956716,
+    'wrist_flex.pos': 74.10444540353907,
+    'wrist_roll.pos': -1.6308568470100937,
+    'gripper.pos': 1.0107816711590296,
+    'wrist': np.array(shape=(480, 640, 3), dtype=uint8),
+    'side': np.array(shape=(480, 640, 3), dtype=uint8)
+}
+```
+
+1. We get observation_features to generate the input for the policy. We get the values from  dataset (`dataset.features`) or robot configuration (`obs_features = hw_to_dataset_features(robot.observation_features, "observation")`). It maps `observation.state` to each joint, and each image to the corresponding `observation.image.x`
+
+```python
+obs_features = {
+    'observation.state': {'dtype': 'float32', 'shape': (6,), 'names': ['shoulder_pan.pos', 'shoulder_lift.pos', 'elbow_flex.pos', 'wrist_flex.pos', 'wrist_roll.pos', 'gripper.pos']}, 
+    'observation.images.wrist': {'dtype': 'video', 'shape': (480, 640, 3), 'names': ['height', 'width', 'channels']}, 
+    'observation.images.side': {'dtype': 'video', 'shape': (480, 640, 3), 'names': ['height', 'width', 'channels']}}
+```
+
+1. We generate the initial input for the policy using `build_dataset_frame(obs_features, obs, prefix="observation")`
+```python
+
+dataset_frame = build_dataset_frame(obs_features, obs, prefix="observation")
+
+# dataset_frame:
+{   
+    'observation.state': np.array([ -2.524698, -98.81255, 98.48282, 74.10445,  -1.6308569, 1.0107816], dtype=float32), 
+    'observation.images.wrist': np.array(shape=(480, 640, 3), dtype=uint8),
+    'observation.images.side': np.array(shape=(480, 640, 3), dtype=uint8),
+}
+
+```
+
+1. We call `predict_action(observation: dict[str, np.ndarray], policy: PreTrainedPolicy, device: torch.device, use_amp: bool, task: str | None=None, robot_type: str | None = None)`. Internally it will convert input to tensors and add robot_type and task.
+
+```python
+# Will convert all fields to torch (`from_numpy` and `unsqueeze(0)`). Images will be `/255` and `permute(2,0,1).contiguous()`.
+
+observation = {
+    'task': 'Pick up the lego brick.',
+    'robot_type': 'so101_follower',
+    'observation.state': torch.Tensor(shape=[1, 6]),
+    'observation.images.wrist': torch.Tensor(shape=[1, 3, 480, 640]),
+    'observation.images.side': torch.Tensor(shape=[1, 3, 480, 640]),
+}
+
+action = policy.select_action(observation) # shape = [1,6]
+action = action.squeeze(0) # shape = [6]
+```
+
+1. Transform actions tensor (shape=[6]) to robot specific actions (joint.pos) then call `robot.send_action`
+```python
+action_values = predict_action(...)
+action = {key: action_values[i].item() for i, key in enumerate(robot.action_features)}
+
+# action = { # all values are float
+#   'shoulder_pan.pos': -5.473992839917791, 
+#   'shoulder_lift.pos': -17.40812786691692, 
+#   'elbow_flex.pos': 35.52430382950564, 
+#   'wrist_flex.pos': 60.002333510349644, 
+#   'wrist_roll.pos': 1.6304100696448507, 
+#   'gripper.pos': 2.3112573960823086
+# }

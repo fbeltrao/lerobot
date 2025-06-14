@@ -49,6 +49,7 @@ class ObservationRequest(BaseModel):
     images: dict[str, str]
     state: list[float]
     task: str
+    robot_type: str | None = None
 
 
 class PolicyResponse(BaseModel):
@@ -100,22 +101,18 @@ def process_policy(request: ObservationRequest) -> list[list[float]]:
 
     obs = {
         OBS_STATE_KEY: np.array(request.state),
-        "task": request.task,
-        "robot_type": [policy.robot_type] if hasattr(policy, "robot_type") else [""],
     }
 
     for img_name, image_value in request.images.items():
         obs[img_name] = nparray_from_image_base64(img_name, image_value, store_image=True)
 
-    task = obs.pop("task", "")
-    robot_type = obs.pop("robot_type", "")
     predicted = predict_action(
         observation=obs, 
         policy=policy, 
         device=get_safe_torch_device(policy.config.device), 
         use_amp=policy.config.use_amp,
-        task=task,
-        robot_type=robot_type,
+        task=request.task or "",
+        robot_type=request.robot_type or "",
     )
 
     # Convert the predicted actions to a list of lists
