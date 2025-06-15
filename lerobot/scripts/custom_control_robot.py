@@ -22,7 +22,9 @@ from lerobot.common.cameras.opencv import (  # DO NOT REMOVE: required for the c
 from lerobot.common.cameras.opencv.configuration_opencv import (
     OpenCVCameraConfig,  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
 )
+from lerobot.common.constants import OBS_STATE
 from lerobot.common.datasets.utils import build_dataset_frame, hw_to_dataset_features
+from lerobot.common.policies.act.modeling_act import ACTPolicy
 from lerobot.common.policies.pi0fast.modeling_pi0fast import PI0FASTPolicy
 from lerobot.common.robots import (  # DO NOT REMOVE: required for the config parser  # noqa: F401, F811
     Robot,
@@ -46,13 +48,6 @@ from lerobot.configs.policies import PreTrainedConfig
 ###################################################
 
 
-
-OBS_STATE_KEY = "observation.state"
-OBS_IMAGE_FRONT_KEY = "observation.images.front"
-OBS_IMAGE_WRIST_KEY = "observation.images.wrist"
-
-
-
 def connect_robot(config: RobotConfig) -> Robot:
     
     robot = make_robot_from_config(config)
@@ -65,20 +60,17 @@ def connect_robot(config: RobotConfig) -> Robot:
 
 def create_local_policy() -> PI0FASTPolicy:
 
-    # policy = PI0FASTPolicy.from_pretrained("Xiaoyan97/so100-pi0fast")
-    pretrained_name_or_path = "lerobot/pi0"
-    pretrained_name_or_path = "Xiaoyan97/so100-pi0fast"
-    pretrained_name_or_path = "sengi/pi0_so100_pretrain_500"
-    pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable_10_stepslast"
-    pretrained_name_or_path = "fbeltrao/pi0fast_so101_unplug_cable_5000_steps"
     pretrained_name_or_path = "fbeltrao/pi0fast_so101_multi_task"
+    pretrained_name_or_path = "fbeltrao/act_so101_multi_task"
+    
     revision = "v5000steps"
     policy_config = PreTrainedConfig.from_pretrained(pretrained_name_or_path=pretrained_name_or_path, revision=revision)
     policy_config.device="cpu"  # Force CPU for compatibility
+    
+    # policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, config=policy_config, revision=revision)
+    policy = ACTPolicy.from_pretrained(pretrained_name_or_path, config=policy_config, revision=revision)
 
-    policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, config=policy_config, revision=revision)
     policy.eval()
-    # # device = "cuda" if torch.cuda.is_available() else "cpu"
     device = "cpu"  # Force CPU for compatibility
     policy.to(device)
     return policy
@@ -118,7 +110,7 @@ class PolicyClient:
             elif isinstance(v, np.ndarray):
                 predict_request[k] = v.tolist()        
 
-        predict_request["state"] = predict_request.pop(OBS_STATE_KEY, None)
+        predict_request["state"] = predict_request.pop(OBS_STATE, None)
         predict_request["task"] = obs.get("task", "")
         predict_request["robot_type"] = self.robot_type or ""
         
@@ -161,6 +153,7 @@ class CustomControlConfig:
 
 @draccus.wrap()
 def remote_inference_control(cfg: CustomControlConfig, prompt: str):
+    print("Starting remote inference control loop...")
     robot = connect_robot(cfg.robot)
     move_to_start_position(robot)
 
@@ -185,13 +178,15 @@ def remote_inference_control(cfg: CustomControlConfig, prompt: str):
             print(f"Sending action to robot: {robot_action}")
             robot.send_action(robot_action)
             dt = time.perf_counter() - start_time
-            wait_seconds = max(1.0, 1 / 30 - dt)
+            # wait_seconds = max(1.0, 1 / 30 - dt)
+            wait_seconds = 1 / 30 - dt
             print(f"Waiting {wait_seconds:.4f} seconds...")
             busy_wait(wait_seconds)            
         busy_wait(1)
 
 @draccus.wrap()
 def local_inference_control(cfg: CustomControlConfig, prompt: str):
+    print("Starting local inference control loop...")
     robot = connect_robot(cfg.robot)
     move_to_start_position(robot)
     policy = create_local_policy()
@@ -232,17 +227,15 @@ def local_inference_control(cfg: CustomControlConfig, prompt: str):
         robot.send_action(action)
 
         dt = time.perf_counter() - start_time
-        wait_seconds = max(1.0, 1 / 30 - dt)
+        wait_seconds = 1 / 30 - dt
         print(f"Waiting {wait_seconds:.4f} seconds...")
         busy_wait(wait_seconds)
 
 
-if __name__ == "__main__":
-    print("Starting local inference control loop...")
-
+if __name__ == "__main__":    
     prompt = "Pick up the pen."
     prompt = "Unplug the cable."
     prompt = "Pick up the lego brick."
-    # local_inference_control(prompt)
+    #local_inference_control(prompt)
     remote_inference_control(prompt)
     print("Control loop finished.")

@@ -113,13 +113,14 @@ export POLICY_TYPE=pi0fast
 git clone https://github.com/fbeltrao/lerobot
 cd lerobot
 conda activate lerobot
+az upgrade
 az login -t <tenant> --client-id "<principal-id>"
-python lerobot/scripts/train.py --policy.type $POLICY_TYPE --dataset.repo_id "${HF_USER}/${DATASET}" --log_freq 100 --eval_freq 200 --steps $STEPS --output_dir ""/home/azureuser/cloudfiles/data/outputs/train/${DATASET}_${STEPS}steps" --job_name "${DATASET}_${STEPS}steps"
+python lerobot/scripts/train.py --policy.type $POLICY_TYPE --dataset.repo_id "${HF_USER}/${DATASET}" --log_freq 100 --eval_freq 200 --steps $STEPS --output_dir "/home/azureuser/cloudfiles/data/outputs/train/${POLICY_TYPE}/${DATASET}_${STEPS}steps" --job_name "${POLICY_TYPE}_${DATASET}_${STEPS}steps"
 ```
 
 ### Upload fine tuned model to Hugging face
 
-huggingface-cli upload "${HF_USER}/${POLICY_TYPE}_${DATASET}" "/home/azureuser/cloudfiles/data/outputs/train/${DATASET}_${STEPS}steps/checkpoints/last/pretrained_model/" --revision "v${STEPS}steps"
+huggingface-cli upload "${HF_USER}/${POLICY_TYPE}_${DATASET}" "/home/azureuser/cloudfiles/data/outputs/train/${POLICY_TYPE}/${DATASET}_${STEPS}steps/checkpoints/last/pretrained_model/" --revision "v${STEPS}steps"
 
 
 ## Understanding the inferencing
