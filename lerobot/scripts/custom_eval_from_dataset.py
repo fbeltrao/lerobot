@@ -101,7 +101,7 @@ def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTra
             policy._action_queue.clear()
 
         prediction_start = datetime.datetime.now()
-        action = predict_action(
+        predicted_action = predict_action(
             obs,
             policy,
             torch_device,
@@ -110,7 +110,7 @@ def evaluate_observations_on_policy(observations: Iterable[dict], policy: PreTra
         )
         prediction_duration = datetime.datetime.now() - prediction_start
         expected: list[float] = observation["action"]
-        predicted: list[float] = action.cpu().numpy().tolist()
+        predicted: list[float] = predicted_action.cpu().numpy().tolist()
 
         # Calculate MSE loss
         mse_loss = torch.nn.functional.mse_loss(
