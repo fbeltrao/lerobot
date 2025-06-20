@@ -102,6 +102,36 @@
             }
         },
         {
+            "name": "Fine-tune ACT",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/lerobot/scripts/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                // "--policy.path",
+                // "lerobot/pi0fast_base",
+                "--policy.type",
+                "act",
+                "--dataset.repo_id",
+                "fbeltrao/so101_multi_task",
+                "--log_freq",
+                "1",
+                "--steps",
+                "1",
+                "--batch_size",
+                "1",
+                "--output_dir",
+                "outputs/train/debug",
+                "--job_name",
+                "debug"
+            ],
+            "env": {
+                "MLFLOW_TRACKING_URI": "http://localhost:5000",
+                "MLFLOW_EXPERIMENT_NAME": "lerobot",
+            }
+        },
+        {
             "name": "AML job",
             "type": "debugpy",
             "request": "launch",

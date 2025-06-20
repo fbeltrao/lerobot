@@ -3,6 +3,7 @@
 
 import base64
 import io
+import threading
 import time
 from dataclasses import dataclass
 
@@ -126,14 +127,60 @@ class PolicyClient:
         return res.json()["actions"]
 
 
+class PromptHandler:
+    def __init__(self, initial_prompt: str = ""):
+        self.current_prompt = initial_prompt
+        self.lock = threading.Lock()
+        self.input_thread = None
+        self.stop_flag = False
+        
+    def start(self):
+        """Start the background thread to handle user input"""
+        self.input_thread = threading.Thread(target=self._input_loop, daemon=True)
+        self.input_thread.start()
+        
+    def stop(self):
+        """Stop the input handler"""
+        self.stop_flag = True
+        
+    def get_prompt(self) -> str:
+        """Get the current prompt in a thread-safe way"""
+        with self.lock:
+            return self.current_prompt
+            
+    def _input_loop(self):
+        """Background loop to handle user input"""
+        while not self.stop_flag:
+            try:
+                print("\n" + "="*50)
+                print("Current prompt:", f"'{self.get_prompt()}'")
+                print("Enter new prompt (or press Enter to keep current, 'quit' to stop):")
+                user_input = input("> ").strip()
+                
+                if user_input.lower() == 'quit':
+                    with self.lock:
+                        self.current_prompt = ""
+                    break
+                elif user_input:  # Non-empty input
+                    with self.lock:
+                        self.current_prompt = user_input
+                    print(f"Updated prompt to: '{user_input}'")
+                    
+            except (EOFError, KeyboardInterrupt):
+                with self.lock:
+                    self.current_prompt = ""
+                break
+
+
 
 def move_to_start_position(robot: Robot):
     # Move the robot to a predefined start position
     # This is a placeholder function, you should implement the actual logic to move the robot
     print("Moving robot to start position...")
-    start_position = [10.0,82.0,75.0,83.0,3.0,-0.0]
-    start_position = [2.64,193.62,172.18,79.54,-6.33,0.14]
-    start_position = [-1.20,-99.23,98.30,74.79,-1.16,2.83]
+    # Uncomment and modify one of these start positions as needed:
+    # start_position = [10.0,82.0,75.0,83.0,3.0,-0.0]
+    # start_position = [2.64,193.62,172.18,79.54,-6.33,0.14]
+    # start_position = [-1.20,-99.23,98.30,74.79,-1.16,2.83]
     # robot.send_action(torch.tensor(start_position, dtype=torch.float32, device="cpu"))  # Example action, adjust as needed
     # busy_wait(2)
     print("Robot moved to start position.")
@@ -159,30 +206,51 @@ def remote_inference_control(cfg: CustomControlConfig, prompt: str):
 
     policy = PolicyClient("http://192.168.0.127:8000", robot)  # Adjust the URL to your API endpoint
     obs_features = hw_to_dataset_features(robot.observation_features, "observation")
+    
+    # Initialize the prompt handler with the initial prompt
+    prompt_handler = PromptHandler(prompt)
+    prompt_handler.start()
+    
+    print(f"Starting with prompt: '{prompt}'")
+    print("You can change the prompt at any time by typing in the console.")
 
-    while True:
+    try:
+        while True:
+            # Get the current prompt
+            current_prompt = prompt_handler.get_prompt()
+            
+            # Exit if prompt is empty (user typed 'quit' or interrupted)
+            if not current_prompt:
+                print("Empty prompt received. Stopping control loop...")
+                break
 
-        print("Capturing observation...")
-        obs = robot.get_observation()
-        # print only the positions
-        robot_position = { k: v for k, v in obs.items() if k.endswith(".pos") }
-        print(f"Robot position: {robot_position}")
-        observation_frame = build_dataset_frame(obs_features, obs, prefix="observation")
+            # print("Capturing observation...")
+            obs = robot.get_observation()
+            # print only the positions
+            # robot_position = { k: v for k, v in obs.items() if k.endswith(".pos") }
+            # print(f"Robot position: {robot_position}")
+            observation_frame = build_dataset_frame(obs_features, obs, prefix="observation")
 
-        observation_frame["task"] = prompt
-        actions = policy.select_action(observation_frame)
+            observation_frame["task"] = current_prompt
+            actions = policy.select_action(observation_frame)
 
-        for action in actions:
-            start_time = time.perf_counter()
-            robot_action = {key: action[i] for i, key in enumerate(robot.action_features)}               
-            print(f"Sending action to robot: {robot_action}")
-            robot.send_action(robot_action)
-            dt = time.perf_counter() - start_time
-            # wait_seconds = max(1.0, 1 / 30 - dt)
-            wait_seconds = 1 / 30 - dt
-            print(f"Waiting {wait_seconds:.4f} seconds...")
-            busy_wait(wait_seconds)            
-        busy_wait(1)
+            for action in actions:
+                start_time = time.perf_counter()
+                robot_action = {key: action[i] for i, key in enumerate(robot.action_features)}               
+                # print(f"Sending action to robot: {robot_action}")
+                robot.send_action(robot_action)
+                dt = time.perf_counter() - start_time
+                # wait_seconds = max(1.0, 1 / 30 - dt)
+                wait_seconds = 1 / 30 - dt
+                # print(f"Waiting {wait_seconds:.4f} seconds...")
+                busy_wait(wait_seconds)            
+            busy_wait(1)
+    
+    except KeyboardInterrupt:
+        print("\nControl loop interrupted by user.")
+    finally:
+        prompt_handler.stop()
+        print("Control loop finished.")
 
 @draccus.wrap()
 def local_inference_control(cfg: CustomControlConfig, prompt: str):
@@ -233,9 +301,14 @@ def local_inference_control(cfg: CustomControlConfig, prompt: str):
 
 
 if __name__ == "__main__":    
-    prompt = "Pick up the pen."
-    prompt = "Unplug the cable."
-    prompt = "Pick up the lego brick."
-    #local_inference_control(prompt)
-    remote_inference_control(prompt)
-    print("Control loop finished.")
+    # Set initial prompt - this can be changed during runtime via console input
+    initial_prompt = "Pick up the pen."
+    # initial_prompt = "Unplug the cable."
+    # initial_prompt = "Pick up the lego brick."
+    
+    print("Starting robot control with interactive prompts...")
+    print("You can change the task prompt at any time during execution.")
+    print("Type 'quit' when prompted to stop the robot.")
+    
+    #local_inference_control(initial_prompt)
+    remote_inference_control(initial_prompt)

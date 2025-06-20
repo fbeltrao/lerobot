@@ -7,8 +7,8 @@
 # - pillow
 # pip install fastapi uvicorn transformers==4.48.1 pydantic pillow
 import base64
-from dataclasses import dataclass
 import io
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
@@ -20,10 +20,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from pydantic import BaseModel
 
+from lerobot.common.constants import ACTION
 from lerobot.common.policies.act.modeling_act import ACTPolicy
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.policies.pi0fast.modeling_pi0fast import PI0FASTPolicy
 from lerobot.common.policies.pretrained import PreTrainedPolicy
+from lerobot.common.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 from lerobot.common.utils.control_utils import predict_action
 from lerobot.common.utils.utils import get_safe_torch_device
 from lerobot.configs import parser
@@ -97,6 +99,8 @@ def process_policy(request: ObservationRequest) -> list[list[float]]:
     for img_name, image_value in request.images.items():
         obs[img_name] = nparray_from_image_base64(img_name, image_value, store_image=True)
 
+    policy.reset()
+
     predicted = predict_action(
         observation=obs, 
         policy=policy, 
@@ -110,12 +114,24 @@ def process_policy(request: ObservationRequest) -> list[list[float]]:
     actions = []
     actions.append(predicted.cpu().numpy().tolist())
 
-    if "_action_queue" in policy.__dict__:
-        # If the policy has an action queue, we need to pop the first action
-        while len(policy._action_queue) > 0:
-            action = policy._action_queue.popleft()
-            actions.append(action.cpu().numpy()[0].tolist())
+    actions.extend(extract_actions_from_policy_queue(policy))
+    return actions
 
+
+def extract_actions_from_policy_queue(policy: PreTrainedPolicy) -> list[list[float]]:
+    actions: list[list[float]] = []
+    for internal_queue_name in ["_action_queue", "_queues"]:
+        if hasattr(policy, internal_queue_name):
+            # If the policy has an action queue, we need to pop the first action
+            queue = getattr(policy, internal_queue_name)
+            if isinstance(queue, dict):
+                queue = queue.get(ACTION, None)
+            if queue is not None:
+                while len(queue) > 0:
+                    action = queue.popleft()
+                    actions.append(action.cpu().numpy()[0].tolist())
+            break
+    
     return actions
 
 
@@ -128,17 +144,22 @@ async def on_startup():
 async def load_model() -> tuple[PreTrainedPolicy, Callable[[ObservationRequest], list[torch.Tensor]]] :
     """Load the model when the application starts"""
     
-    # pretrained_name_or_path = "fbeltrao/pi0fast_so101_multi_task"
-    # revision = "v5000steps"
-
-    # print(f"Loading policy model {pretrained_name_or_path} (revision={revision})... This may take a while.")
-
+    # pretrained_name_or_path = "fbeltrao/pi0fast_so101_multi_task_v2"
+    # revision = "v10000steps"
     # policy = PI0FASTPolicy.from_pretrained(pretrained_name_or_path, revision=revision)
     
 
-    pretrained_name_or_path = "fbeltrao/act_so101_multi_task"
-    revision= "v5000steps"
+    # pretrained_name_or_path = "fbeltrao/act_so101_multi_task"
+    # revision= "v5000steps"    
+
+    pretrained_name_or_path = "fbeltrao/act_so101_multi_task_v2"
+    revision = "v10000steps"
     policy = ACTPolicy.from_pretrained(pretrained_name_or_path, revision=revision)
+
+
+    # pretrained_name_or_path = "fbeltrao/smolvla_so101_multi_task_v2"
+    # revision = "v10000steps"
+    # policy = SmolVLAPolicy.from_pretrained(pretrained_name_or_path, revision=revision)
 
     policy.eval()
     policy.reset()
