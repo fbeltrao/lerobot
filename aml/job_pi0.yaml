@@ -1,0 +1,38 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: >-
+ pip install -e ".[openpi0]" && \
+ python -m lerobot.scripts.train \
+    --policy.type=${{inputs.POLICY_TYPE}} \
+    --policy.device=cuda \
+    --log_freq 100 \
+    --eval_freq 200 \
+    --steps $STEPS
+    --output_dir="${{outputs.MODEL_OUTPUTS}}/${{inputs.POLICY_TYPE}}/${{inputs.DATASET}}_${{inputs.STEPS}}steps" \
+    --job_name "${{inputs.POLICY_TYPE}}_${{inputs.DATASET}}_${{inputs.STEPS}}steps" \
+    --dataset.repo_id "${HF_USER}/${{inputs.DATASET}}"
+    --batch_size=${{inputs.BATCH_SIZE}} \
+    --save_freq 5000
+environment: azureml:lerobot-openpi0-env:6
+inputs:
+    DATASET: so101_multi_task
+    HF_USER: fbeltrao
+    STEPS: 50
+    POLICY_TYPE: pi0fast
+    BATCH_SIZE: 16
+environment_variables:
+    HF_TOKEN: ""
+outputs:
+  MODEL_OUTPUTS:
+    type: uri_folder
+    path: azureml://datastores/nora_datasets/paths/outputs
+  # MODEL_INPUTS:
+  #   type: uri_folder
+  #   path: azureml://datastores/nora_datasets/paths/inputs/so101-goat-picking-v1
+  PI0FAST_CHECKPOINT:
+    type: uri_folder
+    path: azureml://datastores/nora_datasets/paths/pi0fast_base
+# display_name: pi0fast_goat_picking_finetuning
+# experiment_name: pi0fast_goat_picking_finetuning
+compute: nc80adis-h100-v5-single
+code: ..
+  
