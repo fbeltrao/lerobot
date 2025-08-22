@@ -1,0 +1,38 @@
+# Configure the base image
+ARG PYTHON_VERSION=3.10
+# FROM python:${PYTHON_VERSION}-slim
+FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04@sha256:2d913b09e6be8387e1a10976933642c73c840c0b735f0bf3c28d97fc9bc422e0
+
+# Configure environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    MUJOCO_GL=egl \
+    PATH=/lerobot/.venv/bin:$PATH
+
+# Install system dependencies and uv (as root)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git curl libglib2.0-0 libegl1-mesa-dev ffmpeg \
+    libusb-1.0-0-dev speech-dispatcher libgeos-dev portaudio19-dev \
+    && curl -LsSf https://astral.sh/uv/install.sh | sh \
+    && mv /root/.local/bin/uv /usr/local/bin/uv \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create application directory and set permissions
+WORKDIR /lerobot
+
+# Create the virtual environment
+# We use a virtual environment inside the container—even though the container itself \
+# provides isolation—to closely resemble local development and allow users to \
+# run other Python projects in the same container without dependency conflicts.
+RUN uv venv --python 3.10
+
+# Install Python dependencies for caching
+COPY pyproject.toml README.md MANIFEST.in ./
+COPY src/ src/
+RUN uv pip install --no-cache ".[all]"
+
+# Copy the rest of the application code
+# Make sure to have the git-LFS files for testing
+COPY . .
+
+# Set the default command
+CMD ["/bin/bash"]

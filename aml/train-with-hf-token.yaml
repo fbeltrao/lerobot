@@ -1,0 +1,48 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: >-
+ GIT_LFS_SKIP_SMUDGE=1 uv pip install -e . &&
+ uv pip install azureml-mlflow &&
+ TEMP_TOKEN_PATH=$(uv run ./aml/get_hf_token.py --keyvault-name ${{inputs.keyvault}} --secret-name ${{inputs.hf_token_secret}}) &&
+ export HF_TOKEN=$(cat "$TEMP_TOKEN_PATH") &&
+ rm "$TEMP_TOKEN_PATH" && 
+ lerobot-train 
+ --dataset.repo_id not-used/not-used
+ --dataset.root ${{inputs.dataset}}
+ --policy.type ${{inputs.policy_type}}
+ --output_dir ${{outputs.checkpoint}}
+ --policy.device cuda
+ --policy.push_to_hub false
+ --steps ${{inputs.steps}}
+ --batch_size ${{inputs.batch_size}}
+ --eval_freq ${{inputs.eval_freq}}
+ --log_freq ${{inputs.log_freq}}
+ --save_checkpoint ${{inputs.save_checkpoint}}
+ --save_freq ${{inputs.save_freq}}
+ --seed ${{inputs.seed}}
+ --mlflow.enable true
+ --mlflow.disable_artifact true
+ ${{inputs.extra_flags}}
+environment: azureml:lerobot@latest
+inputs:
+  steps: 100000
+  seed: 1000
+  policy_type: act
+  batch_size: 8
+  eval_freq: 20000
+  log_freq: 200
+  save_checkpoint: true
+  save_freq: 20000
+  extra_flags: ";"
+  keyvault: <your-keyvault-name>
+  hf_token_secret: hf-token
+  dataset:
+    type: uri_folder
+    path: <your-dataset-path>
+    mode: ro_mount
+outputs:
+  checkpoint:
+    type: uri_folder
+    mode: rw_mount
+experiment_name: lerobot
+code: ../
+compute: <your-compute-name>
