@@ -34,7 +34,8 @@ from lerobot.envs.utils import close_envs
 from lerobot.optim.factory import make_optimizer_and_scheduler
 from lerobot.policies.factory import make_policy, make_pre_post_processors
 from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.rl.wandb_utils import WandBLogger
+from lerobot.utils.experiment_logger import ExperimentLogger
+from lerobot.utils.logger_factory import create_experiment_loggers
 from lerobot.scripts.lerobot_eval import eval_policy_all
 from lerobot.utils.logging_utils import AverageMeter, MetricsTracker
 from lerobot.utils.random_utils import set_seed
@@ -162,13 +163,12 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
     if is_main_process:
         logging.info(pformat(cfg.to_dict()))
 
-    # Initialize wandb only on main process
-    if cfg.wandb.enable and cfg.wandb.project and is_main_process:
-        wandb_logger = WandBLogger(cfg)
-    else:
-        wandb_logger = None
-        if is_main_process:
-            logging.info(colored("Logs will be saved locally.", "yellow", attrs=["bold"]))
+    # Initialize logger on main process
+    experiment_logger: ExperimentLogger | None = None
+    if is_main_process:
+        experiment_logger = create_experiment_loggers(cfg)
+    if experiment_logger is None and is_main_process:        
+        logging.info(colored("Logs will be saved locally.", "yellow", attrs=["bold"]))
 
     if cfg.seed is not None:
         set_seed(cfg.seed, accelerator=accelerator)
@@ -352,11 +352,11 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
         if is_log_step:
             logging.info(train_tracker)
-            if wandb_logger:
+            if experiment_logger:
                 wandb_log_dict = train_tracker.to_dict()
                 if output_dict:
                     wandb_log_dict.update(output_dict)
-                wandb_logger.log_dict(wandb_log_dict, step)
+                experiment_logger.log_dict(wandb_log_dict, step)
             train_tracker.reset_averages()
 
         if cfg.save_checkpoint and is_saving_step:
@@ -374,8 +374,8 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
                     postprocessor=postprocessor,
                 )
                 update_last_checkpoint(checkpoint_dir)
-                if wandb_logger:
-                    wandb_logger.log_policy(checkpoint_dir)
+                if experiment_logger:
+                    experiment_logger.log_policy(checkpoint_dir)
 
             accelerator.wait_for_everyone()
 
@@ -421,10 +421,10 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
                 eval_tracker.eval_s = aggregated.pop("eval_s")
                 eval_tracker.avg_sum_reward = aggregated.pop("avg_sum_reward")
                 eval_tracker.pc_success = aggregated.pop("pc_success")
-                if wandb_logger:
+                if experiment_logger:
                     wandb_log_dict = {**eval_tracker.to_dict(), **eval_info}
-                    wandb_logger.log_dict(wandb_log_dict, step, mode="eval")
-                    wandb_logger.log_video(eval_info["overall"]["video_paths"][0], step, mode="eval")
+                    experiment_logger.log_dict(wandb_log_dict, step, mode="eval")
+                    experiment_logger.log_video(eval_info["overall"]["video_paths"][0], step, mode="eval")
 
             accelerator.wait_for_everyone()
 
@@ -433,6 +433,10 @@ def train(cfg: TrainPipelineConfig, accelerator: Accelerator | None = None):
 
     if is_main_process:
         logging.info("End of training")
+
+        # Clean up experiment logger
+        if experiment_logger:
+            experiment_logger.finish()
 
         if cfg.policy.push_to_hub:
             unwrapped_policy = accelerator.unwrap_model(policy)
