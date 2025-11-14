@@ -21,7 +21,7 @@ command: >-
  ${{inputs.extra_flags}}
 environment: azureml:lerobot@latest
 inputs:
-  steps: 100000
+  steps: 10000
   seed: 1000
   policy_type: act
   batch_size: 8

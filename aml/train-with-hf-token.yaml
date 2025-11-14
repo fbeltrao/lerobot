@@ -2,9 +2,7 @@ $schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
 command: >-
  GIT_LFS_SKIP_SMUDGE=1 uv pip install -e . &&
  uv pip install azureml-mlflow &&
- TEMP_TOKEN_PATH=$(uv run ./aml/get_hf_token.py --keyvault-name ${{inputs.keyvault}} --secret-name ${{inputs.hf_token_secret}}) &&
- export HF_TOKEN=$(cat "$TEMP_TOKEN_PATH") &&
- rm "$TEMP_TOKEN_PATH" && 
+ uv run ./aml/resolve_hf_token.py --keyvault-name ${{inputs.keyvault}} --secret-name ${{inputs.hf_token_secret}}) &&
  lerobot-train 
  --dataset.repo_id not-used/not-used
  --dataset.root ${{inputs.dataset}}
@@ -33,7 +31,7 @@ inputs:
   save_checkpoint: true
   save_freq: 20000
   extra_flags: ";"
-  keyvault: <your-keyvault-name>
+  keyvault: " "
   hf_token_secret: hf-token
   dataset:
     type: uri_folder

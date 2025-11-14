@@ -1,7 +1,8 @@
 # Configure the base image
 ARG PYTHON_VERSION=3.10
 # FROM python:${PYTHON_VERSION}-slim
-FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04@sha256:2d913b09e6be8387e1a10976933642c73c840c0b735f0bf3c28d97fc9bc422e0
+#FROM nvidia/cuda:12.2.2-cudnn8-runtime-ubuntu22.04@sha256:2d913b09e6be8387e1a10976933642c73c840c0b735f0bf3c28d97fc9bc422e0
+FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu22.04@sha256:9585fe533ab5f5231b1d63ad660e6e5fc63aa02191181d7c30cf814a693dd11a
 
 # Configure environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
