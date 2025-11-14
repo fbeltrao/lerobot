@@ -25,7 +25,8 @@ Azure ML needs a consistent, reproducible environment to run your training jobs.
 1. Run command to create environment
 
 ```
-az ml environment create --name lerobot --build-context . --dockerfile-path ./aml/Dockerfile.aml --tags "git_hash=$(git rev-parse HEAD)"
+01-create-env.ps1
+
 ```
 
 ## Step 2 - Upload dataset
@@ -82,8 +83,7 @@ To find out the Key Vault run command:
 
 ```Powershell
 # Powershell
-$KEYVAULT_NAME=($(az ml workspace show --query "key_vault" -o tsv) -split '/')[-1]
-echo $KEYVAULT_NAME
+./aml/03-create-hf-token-secret.ps1 -HfToken (Read-Host "Enter HF Token" -AsSecureString)
 ```
 
 ```bash
