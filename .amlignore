@@ -2,3 +2,8 @@ media
 outputs
 tests
 docs
+.git
+.vscode
+.github
+data
+outputs

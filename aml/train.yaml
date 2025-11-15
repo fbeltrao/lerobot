@@ -7,7 +7,7 @@ command: >-
  --dataset.root ${{inputs.dataset}}
  --policy.type ${{inputs.policy_type}}
  --output_dir ${{outputs.checkpoint}}
- --policy.device cuda
+ --policy.device ${{inputs.device}}
  --policy.push_to_hub false
  --steps ${{inputs.steps}}
  --batch_size ${{inputs.batch_size}}
@@ -29,6 +29,7 @@ inputs:
   log_freq: 200
   save_checkpoint: true
   save_freq: 20000
+  device: cuda
   extra_flags: ";"
   dataset:
     type: uri_folder
