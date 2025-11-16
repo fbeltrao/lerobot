@@ -5,5 +5,8 @@ docs
 .git
 .vscode
 .github
+.venv
+.env
+.pytest_cache
 data
 outputs
