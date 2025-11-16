@@ -59,6 +59,12 @@ Yay, we can finally train our model! By creating a job, we are instructing Azure
 
 ```
 az ml job create -f ./aml/train.yaml
+
+# to set the dataset
+az ml job create -f ./aml/train.yaml --set "inputs.dataset.path=azureml:<data-asset-name>:<version or @latest>"
+
+# to set the compute name
+az ml job create -f ./aml/train.yaml --set "compute=<compute-name>"
 ```
 
 ## Step 4 - Download checkpoint
