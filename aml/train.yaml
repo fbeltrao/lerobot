@@ -37,7 +37,7 @@ inputs:
     mode: ro_mount
 outputs:
   checkpoint:
-    type: uri_folder
+    type: custom_model
     mode: rw_mount
 experiment_name: lerobot
 code: ../
