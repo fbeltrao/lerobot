@@ -34,24 +34,9 @@ Azure ML needs a consistent, reproducible environment to run your training jobs.
 Azure ML needs access to your training data, but it runs in the cloud where your local files aren't accessible. This step uploads your dataset to Azure's cloud storage and registers it as a managed data asset. This allows Azure ML to efficiently distribute your data to compute resources and enables data versioning, lineage tracking, and team collaboration. The metadata tags help you organize and discover datasets later.
 
 ```bash
-# In bash remove the $ prefix when setting variables values
-$DATASET_NAME="my-dataset"
-$DATASET_VERSION="1"
-$DATASET_PATH="/path/to/dataset"
+./aml/02-create-dataset.ps1 -DatasetName <dataset-name> -DatasetPath <local-path>
 ```
 
-```bash
-$DATASET_CODEBASE_VERSION=$(jq -r '.codebase_version' "$DATASET_PATH/meta/info.json")
-$DATASET_OBSERVATIONS=$(jq -r '.features | keys | join(",")' "$DATASET_PATH/meta/info.json")
-$DATASET_FPS=$(jq -r '.fps' "$DATASET_PATH/meta/info.json")
-$DATASET_EPISODE_COUNT=$(jq -r '.total_episodes' "$DATASET_PATH/meta/info.json")
-$DATASET_FIRST_TASK=$(jq -r 'select(.task_index == 0) | .task' "$DATASET_PATH/meta/tasks.jsonl")
-$DATASET_DESCRIPTION="Lerobot dataset with task $DATASET_FIRST_TASK"
-```
-
-```bash
-az ml data create --name "$DATASET_NAME" --path "DATASET_PATH/*" --description "$DATASET_DESCRIPTION" --version "$DATASET_VERSION" --set "tags.observations=$DATASET_OBSERVATIONS" --set "tags.episodes=$DATASET_EPISODE_COUNT" --set "tags.fps=$DATASET_FPS" --set "tags.task=$DATASET_FIRST_TASK" --set "tags.codebase_version=$DATASET_CODEBASE_VERSION" --type uri_folder
-```
 
 ## Step 3 - Run fine-tuning job
 

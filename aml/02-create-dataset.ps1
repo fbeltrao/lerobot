@@ -27,6 +27,18 @@ try {
     exit 1
 }
 
+# Check if uv is available
+try {
+    $uvVersion = uv --version 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "uv not found"
+    }
+    Write-Host "✓ uv is available: $uvVersion" -ForegroundColor Green
+} catch {
+    Write-Error "uv is not installed or not in PATH. Please install uv from https://docs.astral.sh/uv/"
+    exit 1
+}  
+
 # Check if Azure CLI is available
 try {
     $az_version = az version 2>$null
@@ -69,19 +81,6 @@ if (-not (Test-Path $DatasetPath)) {
     exit 1
 }
 
-# Validate that required metadata files exist
-$infoJsonPath = Join-Path $DatasetPath "meta\info.json"
-$tasksJsonlPath = Join-Path $DatasetPath "meta\tasks.jsonl"
-
-if (-not (Test-Path $infoJsonPath)) {
-    Write-Error "Required metadata file not found: $infoJsonPath"
-    exit 1
-}
-
-if (-not (Test-Path $tasksJsonlPath)) {
-    Write-Error "Required metadata file not found: $tasksJsonlPath"
-    exit 1
-}
 
 # Validate and determine dataset version
 Write-Host "Validating dataset version..." -ForegroundColor Green
@@ -121,26 +120,18 @@ try {
 
 Write-Host "Final dataset version will be: $DatasetVersion" -ForegroundColor Green
 
-Write-Host "Extracting metadata from dataset..." -ForegroundColor Green
-
-# Extract metadata from dataset files
-$datasetCodebaseVersion = jq -r '.codebase_version' "$infoJsonPath"
-$datasetObservations = jq -r '.features | keys | join(",")' "$infoJsonPath"
-$datasetFps = jq -r '.fps' "$infoJsonPath"
-$datasetEpisodeCount = jq -r '.total_episodes' "$infoJsonPath"
-$datasetFirstTask = jq -r 'select(.task_index == 0) | .task' "$tasksJsonlPath"
-$datasetDescription = "Lerobot dataset with task $datasetFirstTask"
+Write-Host "Extracting metadata from dataset. This can take a while..." -ForegroundColor Green
+$dataset_tags=$(uv run .\aml\extract_lerobot_dataset_tags.py --root "$DatasetPath" | ConvertFrom-Json)
 
 Write-Host "Dataset metadata:" -ForegroundColor Yellow
 Write-Host "  Name: $DatasetName"
 Write-Host "  Version: $DatasetVersion"
-Write-Host "  Path: $DatasetPath"
-Write-Host "  Codebase Version: $datasetCodebaseVersion"
-Write-Host "  Observations: $datasetObservations"
-Write-Host "  FPS: $datasetFps"
-Write-Host "  Episode Count: $datasetEpisodeCount"
-Write-Host "  First Task: $datasetFirstTask"
-Write-Host "  Description: $datasetDescription"
+
+$dataset_tags | Get-Member -MemberType NoteProperty | ForEach-Object {
+    $key = $_.Name
+    $value = $dataset_tags.$key
+    Write-Host "${key}: $value"
+}
 
 Write-Host "Creating dataset in Azure ML..." -ForegroundColor Green
 
@@ -154,17 +145,21 @@ if ($normalizedPath.EndsWith('/')) {
 $createCommand = @(
     "az", "ml", "data", "create",
     "--name", $DatasetName,
+    "--description", "Lerobot dataset $DatasetName",
     "--path", $normalizedPath,
-    "--description", $datasetDescription,
     "--version", $DatasetVersion,
-    "--set", "tags.observations=$datasetObservations",
-    "--set", "tags.episodes=$datasetEpisodeCount", 
-    "--set", "tags.fps=$datasetFps",
-    "--set", "tags.task=$datasetFirstTask",
-    "--set", "tags.codebase_version=$datasetCodebaseVersion",
     "--type", "uri_folder"
 )
 
+## Add tags to the create command
+$dataset_tags | Get-Member -MemberType NoteProperty | ForEach-Object {
+    $key = $_.Name
+    $value = $dataset_tags.$key
+    $createCommand += "--set"
+    $createCommand += "`"tags.$key=$value`""
+}
+
+Write-Host "$($createCommand -join ' ')" -ForegroundColor Yellow
 & $createCommand[0] $createCommand[1..($createCommand.Length-1)]
 
 if ($LASTEXITCODE -eq 0) {
