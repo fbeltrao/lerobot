@@ -1,0 +1,16 @@
+media
+outputs
+tests
+docs
+.git
+.vscode
+.github
+.venv
+.env
+.pytest_cache
+.ruff_cache
+__pycache__
+data
+mlruns
+examples
+lerobot.egg-info
