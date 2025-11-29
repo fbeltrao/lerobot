@@ -1,0 +1,50 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+command: >-
+ GIT_LFS_SKIP_SMUDGE=1 uv pip install --python /lerobot/.venv/bin/python .["all"] azureml-mlflow &&
+ uv run aml/scripts/resolve_hf_token.py --keyvault-name ${{inputs.keyvault}} --secret-name ${{inputs.hf_token_secret}} &&
+ /lerobot/.venv/bin/python aml/scripts/aml_train.py
+ --dataset.repo_id ${{inputs.repo_id}}
+ --dataset.root ${{inputs.dataset}}
+ --policy.type ${{inputs.policy_type}}
+ --output_dir ${{outputs.checkpoint}}
+ --policy.device ${{inputs.device}}
+ --policy.push_to_hub false
+ --steps ${{inputs.steps}}
+ --batch_size ${{inputs.batch_size}}
+ --eval_freq ${{inputs.eval_freq}}
+ --log_freq ${{inputs.log_freq}}
+ --save_checkpoint ${{inputs.save_checkpoint}}
+ --save_freq ${{inputs.save_freq}}
+ --seed ${{inputs.seed}}
+ --wandb.enable true
+ --wandb.disable_artifact true
+ --wandb.project lerobot
+ ${{inputs.extra_flags}}
+environment: azureml:lerobot@latest
+inputs:
+  repo_id: not-used/not-used
+  steps: 10000
+  seed: 1000
+  policy_type: act
+  batch_size: 8
+  eval_freq: 20000
+  log_freq: 200
+  save_checkpoint: true
+  save_freq: 20000
+  device: cuda
+  extra_flags: ";"
+  hf_token_secret: hf-token
+  keyvault: false
+  dataset:
+    type: uri_folder
+    path: <your-dataset-path>
+    mode: ro_mount
+outputs:
+  checkpoint:
+    type: custom_model
+    mode: rw_mount
+experiment_name: lerobot
+code: ../../ # project root, relative to yaml file, not where the command is being run from
+compute: <your-compute-name>
+resources:
+    shm_size: 8g

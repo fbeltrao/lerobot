@@ -1,0 +1,1 @@
+az ml environment create --name lerobot --build-context . --dockerfile-path ./aml/docker/Dockerfile.aml --tags "git_hash=$(git rev-parse HEAD)" --description "Lerobot environment"
