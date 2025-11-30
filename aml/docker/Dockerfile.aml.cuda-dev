@@ -1,11 +1,13 @@
 # Configure the base image
 ARG PYTHON_VERSION=3.10
-FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu22.04@sha256:9585fe533ab5f5231b1d63ad660e6e5fc63aa02191181d7c30cf814a693dd11a
-
+# Use CUDA development image instead of runtime to include nvcc and build tools
+FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04@sha256:1cb02388491c05441f8963d42bc38b6ec5462fba95a8e3bb2cb8e6091f0738c8
 # Configure environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     MUJOCO_GL=egl \
-    PATH=/lerobot/.venv/bin:$PATH
+    PATH=/lerobot/.venv/bin:$PATH \
+    CUDA_HOME=/usr/local/cuda \
+    NVCC_APPEND_FLAGS=-allow-unsupported-compiler
 
 # Install system dependencies and uv (as root)
 RUN apt-get update && apt-get install -y --no-install-recommends \

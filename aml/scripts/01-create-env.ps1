@@ -10,4 +10,5 @@ try {
     exit 1
 }
 
-az ml environment create --name lerobot --build-context . --dockerfile-path ./aml/docker/Dockerfile.aml --tags "git_hash=$(git rev-parse HEAD)" --description "Lerobot environment"
+az ml environment create --name lerobot --build-context . --dockerfile-path ./aml/docker/Dockerfile.aml --tags "git_hash=$(git rev-parse HEAD)" --description "Lerobot environment CUDA runtime"
+az ml environment create --name lerobot-cuda-dev --build-context . --dockerfile-path ./aml/docker/Dockerfile.aml.cuda-dev --tags "git_hash=$(git rev-parse HEAD)" --description "Lerobot environment CUDA development"
