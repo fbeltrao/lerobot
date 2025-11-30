@@ -15,12 +15,46 @@ try {
     exit 1
 }
 
-# Build the command with the fixed -f parameter and any additional arguments
-$command = @("ml", "job", "create", "-f", "./aml/jobs/train.yaml")
+# Parse extra arguments to detect policy type
+$policyType = $null
+$filteredArguments = @()
 
-# Add any extra arguments passed to the script
-if ($ExtraArguments) {
-    $command += $ExtraArguments
+for ($i = 0; $i -lt $ExtraArguments.Count; $i++) {
+    $arg = $ExtraArguments[$i]
+    if ($arg -eq "--set" -and $i + 1 -lt $ExtraArguments.Count) {
+        $setArg = $ExtraArguments[$i + 1]
+        if ($setArg -match '^inputs\.policy_type=(.+)$') {
+            $policyType = $matches[1]
+            Write-Host "Detected policy type: $policyType" -ForegroundColor Yellow
+            # Skip both --set and the policy_type argument
+            $i++
+            continue
+        }
+    }
+    $filteredArguments += $arg
+}
+
+# Determine which YAML file to use
+$yamlFile = "./aml/jobs/train.yaml"
+if ($policyType) {
+    $policySpecificFile = "./aml/jobs/train-$policyType.yaml"
+    if (Test-Path $policySpecificFile) {
+        $yamlFile = $policySpecificFile
+        Write-Host "Using policy-specific configuration: $yamlFile" -ForegroundColor Green
+    } else {
+        Write-Host "Policy-specific file $policySpecificFile not found, using generic train.yaml" -ForegroundColor Yellow
+        # Add back the policy type argument since we're using the generic file
+        $filteredArguments += "--set"
+        $filteredArguments += "inputs.policy_type=$policyType"
+    }
+}
+
+# Build the command with the determined YAML file
+$command = @("ml", "job", "create", "-f", $yamlFile)
+
+# Add any remaining extra arguments
+if ($filteredArguments) {
+    $command += $filteredArguments
 }
 
 # Display the command being executed
