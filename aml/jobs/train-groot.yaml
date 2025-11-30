@@ -1,0 +1,57 @@
+$schema: https://azuremlschemas.azureedge.net/latest/commandJob.schema.json
+# To fine-tune a Groot policy model we need to install a few extra dependencies (see https://huggingface.co/docs/lerobot/en/groot)
+# On top of that, there is a error with transformers (due to Eagle25VLImageProcessorFast), requiring the update to a new version (we picked 4.57.3 for now)
+command: >-
+ GIT_LFS_SKIP_SMUDGE=1 uv pip install --python /lerobot/.venv/bin/python "torch>=2.2.1,<2.8.0" "torchvision>=0.21.0,<0.23.0" --index-url https://download.pytorch.org/whl/cu1XX &&
+ uv pip install --python /lerobot/.venv/bin/python ninja "packaging>=24.2,<26.0" &&
+ uv pip install --python /lerobot/.venv/bin/python "flash-attn>=2.5.9,<3.0.0" --no-build-isolation &&
+ uv pip install --python /lerobot/.venv/bin/python ".[all,groot]" azureml-mlflow && 
+ uv pip install --python /lerobot/.venv/bin/python transformers==4.57.3 && 
+ uv run aml/scripts/resolve_hf_token.py --keyvault-name ${{inputs.keyvault}} --secret-name ${{inputs.hf_token_secret}} &&
+ /lerobot/.venv/bin/python aml/scripts/aml_train.py
+ --dataset.repo_id ${{inputs.repo_id}}
+ --dataset.root ${{inputs.dataset}}
+ --policy.type groot
+ --output_dir ${{outputs.checkpoint}}
+ --policy.device ${{inputs.device}}
+ --policy.push_to_hub false
+ --policy.tune_diffusion_model=${{inputs.tune_diffusion_model}}
+ --steps ${{inputs.steps}}
+ --batch_size ${{inputs.batch_size}}
+ --eval_freq ${{inputs.eval_freq}}
+ --log_freq ${{inputs.log_freq}}
+ --save_checkpoint ${{inputs.save_checkpoint}}
+ --save_freq ${{inputs.save_freq}}
+ --seed ${{inputs.seed}}
+ --wandb.enable true
+ --wandb.disable_artifact true
+ --wandb.project lerobot
+ ${{inputs.extra_flags}}
+environment: azureml:lerobot-cuda-dev@latest
+inputs:
+  repo_id: not-used/not-used
+  steps: 10000
+  seed: 1000
+  batch_size: 8
+  eval_freq: 20000
+  log_freq: 200
+  save_checkpoint: true
+  save_freq: 20000
+  device: cuda
+  tune_diffusion_model: false
+  extra_flags: ";"
+  hf_token_secret: hf-token
+  keyvault: false
+  dataset:
+    type: uri_folder
+    path: <your-dataset-path>
+    mode: ro_mount
+outputs:
+  checkpoint:
+    type: custom_model
+    mode: rw_mount
+experiment_name: lerobot
+code: ../../ # project root, relative to yaml file, not where the command is being run from
+compute: <your-compute-name>
+resources:
+    shm_size: 8g

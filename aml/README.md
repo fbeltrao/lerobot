@@ -26,6 +26,7 @@ You're spending too much time setting up environments, tracking experiments, man
 - Login with Azure cli (`az login`)
 - Setup Azure cli to use our current workspace as default: `az configure --defaults workspace=<azure-machine-learning-workspace-name> group=<resource-group-where-machine-learning-workspace-is-located>`. If you don't want to setup defaults, add parameters `-g <resource-group> and -w <workspace-name>` to all usages of Azure command line.
 - Install [jq](https://jqlang.org/) to allow JSON parsing in command line.
+- Install [uv](https://docs.astral.sh/uv/getting-started/installation/) for Python script execution
 
 ## Step 1 - Create environment
 
@@ -36,6 +37,8 @@ Azure ML needs a consistent, reproducible environment to run your training jobs.
 ```bash
 aml/scripts/01-create-env.ps1
 ```
+
+> Note: it will create two environments. A lighter version containing cuda runtime, and a second containing cuda development. Each policy type might need additional dependencies.
 
 ## Step 2 - Upload dataset
 
@@ -60,11 +63,10 @@ aml/scripts/04-train.ps1  --set "compute=<compute-name>"
 
 ## Step 4 - Download checkpoint
 
-After training completes, your trained model (checkpoint files) exists in Azure's cloud storage. To use the model locally for inference, evaluation, or further development, you need to download these checkpoint files back to your local machine. Azure ML automatically manages these outputs and provides easy commands to retrieve them.
+After training completes, your trained model (checkpoint files) exists in Azure's cloud storage. If you want to use the model locally for inference, evaluation, or further development, you must download it.
 
-Once an training job is finished you can download the checkpoint files locally.
 1. Identify the job name
-2. Download the output locally `az ml job download --name <job-name> --download-path ./outputs --output-name checkpoint`
+2. Download the output locally `./aml/scripts/05-download-output.ps1 -JobName <job-name>`
 
 ## Advanced
 
@@ -82,7 +84,6 @@ To find out the Key Vault run command:
 # Powershell
 ./aml/scripts/03-create-hf-token-secret.ps1 -HfToken (Read-Host "Enter HF Token" -AsSecureString)
 ```
-
 
 ```powershell
 $KEYVAULT_NAME=($(az ml workspace show --query "key_vault" -o tsv) -split '/')[-1]
