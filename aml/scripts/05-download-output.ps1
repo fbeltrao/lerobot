@@ -84,6 +84,26 @@ try {
                 
                 Write-Host "✓ Found output path in job: $($outputInfo.path)" -ForegroundColor Green
             }
+        } else {
+            # Handle custom_model outputs without explicit paths
+            if ($outputInfo.type -eq "custom_model") {
+                Write-Host "✓ Found custom_model output without path, discovering datastore..." -ForegroundColor Green
+                
+                # Get the workspace default datastore
+                $workspace = az ml workspace show | ConvertFrom-Json
+                $defaultDatastoreName = $workspace.default_datastore
+                
+                if ($defaultDatastoreName) {
+                    $datastoreName = $defaultDatastoreName
+                    Write-Host "✓ Using workspace default datastore: $datastoreName" -ForegroundColor Green
+                } else {
+                    # Fallback to workspaceblobstore if no default is set
+                    $datastoreName = "workspaceblobstore"
+                    Write-Host "✓ Using fallback datastore: $datastoreName" -ForegroundColor Yellow
+                }
+                
+                $blobPath = "azureml/$JobName/$OutputName"
+            }
         }
     }
     
@@ -98,10 +118,23 @@ try {
         }
     }
     
-    # Fallback to default datastore and path construction if not found in outputs
+    # Fallback: Find the default datastore if not found in outputs
     if (-not $datastoreName) {
-        Write-Host "Output path not found in job, using default datastore..." -ForegroundColor Yellow
-        $datastoreName = "workspaceblobstore"
+        Write-Host "Output path not found in job, discovering default datastore..." -ForegroundColor Yellow
+        
+        # Get the workspace default datastore
+        $workspace = az ml workspace show | ConvertFrom-Json
+        $defaultDatastoreName = $workspace.default_datastore
+        
+        if ($defaultDatastoreName) {
+            $datastoreName = $defaultDatastoreName
+            Write-Host "✓ Using workspace default datastore: $datastoreName" -ForegroundColor Green
+        } else {
+            # Fallback to workspaceblobstore if no default is set
+            $datastoreName = "workspaceblobstore"
+            Write-Host "✓ Using fallback datastore: $datastoreName" -ForegroundColor Yellow
+        }
+        
         $blobPath = "azureml/$JobName/$OutputName"
     }
     
