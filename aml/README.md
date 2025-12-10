@@ -68,6 +68,15 @@ After training completes, your trained model (checkpoint files) exists in Azure'
 1. Identify the job name
 2. Download the output locally `./aml/scripts/05-download-output.ps1 -JobName <job-name>`
 
+
+## Step 5 - Test in simulation
+
+1. Start the inference server. For LeRobot it is `python -m lerobot.async_inference.policy_server --host=127.0.0.1 --port=8080`
+2. In Leisaac environment
+    1. `uv pip install -e "source/leisaac[isaaclab,gr00t,lerobot-async,openpi]"`
+    2. Start inference `uv run scripts/evaluation/policy_inference.py --task "LeIsaac-SO101-PickOrange-v0" --policy_type "lerobot-groot" --policy_port "8080" --policy_language_instruction "Pick up the orange and place it on the plate" --policy_checkpoint_path "/path/to/checkpoint" --device "cuda" --enable_cameras`
+
+
 ## Advanced
 
 Depending on the police type you might require to download base weights from protected hugging face repositories (i.e, pi0fast).
