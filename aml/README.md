@@ -24,6 +24,7 @@ You're spending too much time setting up environments, tracking experiments, man
 
 - [Azure cli](https://learn.microsoft.com/cli/azure/install-azure-cli?view=azure-cli-latest) with [machine learning extension](https://learn.microsoft.com/azure/machine-learning/how-to-configure-cli?view=azureml-api-2&tabs=public).
 - Login with Azure cli (`az login`)
+- An Azure Machine Learning Workspace with a compute cluster or instance with the required GPU (i.e. Standard_NC40ads_H100_v5)
 - Setup Azure cli to use our current workspace as default: `az configure --defaults workspace=<azure-machine-learning-workspace-name> group=<resource-group-where-machine-learning-workspace-is-located>`. If you don't want to setup defaults, add parameters `-g <resource-group> and -w <workspace-name>` to all usages of Azure command line.
 - Install [jq](https://jqlang.org/) to allow JSON parsing in command line.
 - Install [uv](https://docs.astral.sh/uv/getting-started/installation/) for Python script execution
