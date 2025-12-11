@@ -41,8 +41,8 @@ inputs:
     mode: ro_mount
 outputs:
   checkpoint:
-    type: custom_model
-    mode: rw_mount
+    type: uri_folder
+    path: azureml://datastores/workspaceblobstore/paths/<model_type>/<year>/<month>/${{name}}
 experiment_name: lerobot
 code: ../../ # project root, relative to yaml file, not where the command is being run from
 compute: <your-compute-name>
