@@ -71,10 +71,24 @@ After training completes, your trained model (checkpoint files) exists in Azure'
 
 ## Step 5 - Test in simulation
 
-1. Start the inference server. For LeRobot it is `python -m lerobot.async_inference.policy_server --host=127.0.0.1 --port=8080`
+1. Start the inference server. For LeRobot:
+    1. Prepare Python environment: 
+        1. Create virtual environment: `uv venv`
+        1. Install cmake first (build dependency) `uv pip install cmake`
+        1. For Groot support (https://huggingface.co/docs/lerobot/en/groot)
+            1. `uv pip install "torch>=2.2.1,<2.8.0" "torchvision>=0.21.0,<0.23.0" --index-url https://download.pytorch.org/whl/cu1XX`
+            1. `uv pip install ninja "packaging>=24.2,<26.0"`
+            1. `uv pip install "flash-attn>=2.5.9,<3.0.0" --no-build-isolation`
+            1. `python -c "import flash_attn; print(f'Flash Attention {flash_attn.__version__} imported successfully')"`
+        1. Then install LeRobot:  `uv pip install -e ".[all]"` or `uv pip install -e ".[all,groot]"` if you need Groot
+        
+    2. Run `uv run -m lerobot.async_inference.policy_server --host=127.0.0.1 --port=8080`
 2. In Leisaac environment
     1. `uv pip install -e "source/leisaac[isaaclab,gr00t,lerobot-async,openpi]"`
-    2. Start inference `uv run scripts/evaluation/policy_inference.py --task "LeIsaac-SO101-PickOrange-v0" --policy_type "lerobot-groot" --policy_port "8080" --policy_language_instruction "Pick up the orange and place it on the plate" --policy_checkpoint_path "/path/to/checkpoint" --device "cuda" --enable_cameras`
+    2. Start inference 
+    ```
+    CHECKPOINT_PATH=/path/to/checkpoint
+    uv run scripts/evaluation/policy_inference.py --task "LeIsaac-SO101-PickOrange-v0" --policy_type "lerobot-groot" --policy_port "8080" --policy_language_instruction "Pick up the orange and place it on the plate" --policy_checkpoint_path "$CHECKPOINT_PATH" --device "cuda" --enable_cameras`
 
 
 ## Advanced
