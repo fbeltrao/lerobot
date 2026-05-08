@@ -60,6 +60,9 @@ aml/scripts/04-train.ps1 --set "inputs.dataset.path=azureml:<data-asset-name>:<v
 
 # to set the compute name
 aml/scripts/04-train.ps1  --set "compute=<compute-name>"
+
+# to target an Kubernetes cluster
+aml/scripts/04-train.ps1  --set "compute=<cluster-name>" --set "resources.instance_type=<instance-type>"
 ```
 
 ## Step 4 - Download checkpoint

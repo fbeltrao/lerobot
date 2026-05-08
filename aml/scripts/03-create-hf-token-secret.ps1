@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Creates or updates a Hugging Face token secret in Azure Key Vault.

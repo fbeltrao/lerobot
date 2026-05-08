@@ -14,3 +14,4 @@ data
 mlruns
 examples
 lerobot.egg-info
+logs

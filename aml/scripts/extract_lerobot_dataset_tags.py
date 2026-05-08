@@ -1,6 +1,6 @@
 # /// script
 # dependencies = [
-#   "lerobot==0.4.2",
+#   "lerobot[dataset]>=0.5.0",
 # ]
 # ///
 
@@ -11,8 +11,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TypedDict
 
-from lerobot.datasets.backward_compatibility import BackwardCompatibilityError
 from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
+from lerobot.datasets.utils import BackwardCompatibilityError
 
 REPO_ID = "foo/bar"
 

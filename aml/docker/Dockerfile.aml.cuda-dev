@@ -1,7 +1,8 @@
 # Configure the base image
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.12
 # Use CUDA development image instead of runtime to include nvcc and build tools
-FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04@sha256:1cb02388491c05441f8963d42bc38b6ec5462fba95a8e3bb2cb8e6091f0738c8
+FROM nvidia/cuda:12.9.1-cudnn-devel-ubuntu22.04@sha256:827e01ba745d5488e8f199bb9331ca006da97542909af4076b89754cbf5a5a55
+ARG PYTHON_VERSION
 # Configure environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     MUJOCO_GL=egl \
@@ -26,11 +27,11 @@ WORKDIR /lerobot
 # We use a virtual environment inside the container—even though the container itself \
 # provides isolation—to closely resemble local development and allow users to \
 # run other Python projects in the same container without dependency conflicts.
-RUN uv venv --python 3.10
+RUN uv venv --python ${PYTHON_VERSION}
 ENV VIRTUAL_ENV=/lerobot/.venv
 
 # Install Python dependencies for caching
-COPY pyproject.toml README.md MANIFEST.in ./
+COPY pyproject.toml README.md MANIFEST.in setup.py ./
 COPY src/ src/
 RUN uv pip install --no-cache ".[all]" azureml-mlflow
 

@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 # Upload dataset to Azure Machine Learning
 # This script uploads a Lerobot dataset to Azure ML and registers it as a managed data asset
 
@@ -81,6 +83,24 @@ if (-not (Test-Path $DatasetPath)) {
     exit 1
 }
 
+function Format-PowerShellArgument {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Argument
+    )
+
+    if ($Argument -eq "") {
+        return '""'
+    }
+
+    if ($Argument -notmatch '[\s"''`$&|;()<>]') {
+        return $Argument
+    }
+
+    $escapedArgument = $Argument.Replace('`', '``').Replace('"', '`"')
+    return '"' + $escapedArgument + '"'
+}
+
 
 # Validate and determine dataset version
 Write-Host "Validating dataset version..." -ForegroundColor Green
@@ -121,7 +141,7 @@ try {
 Write-Host "Final dataset version will be: $DatasetVersion" -ForegroundColor Green
 
 Write-Host "Extracting metadata from dataset. This can take a while..." -ForegroundColor Green
-$dataset_tags=$(uv run .\aml\extract_lerobot_dataset_tags.py --root "$DatasetPath" | ConvertFrom-Json)
+$dataset_tags=$(uv run ./aml/scripts/extract_lerobot_dataset_tags.py --root "$DatasetPath" | ConvertFrom-Json)
 
 Write-Host "Dataset metadata:" -ForegroundColor Yellow
 Write-Host "  Name: $DatasetName"
@@ -156,10 +176,10 @@ $dataset_tags | Get-Member -MemberType NoteProperty | ForEach-Object {
     $key = $_.Name
     $value = $dataset_tags.$key
     $createCommand += "--set"
-    $createCommand += "`"tags.$key=$value`""
+    $createCommand += "tags.$key=$value"
 }
 
-Write-Host "$($createCommand -join ' ')" -ForegroundColor Yellow
+Write-Host "$(([string[]]($createCommand | ForEach-Object { Format-PowerShellArgument $_ })) -join ' ')" -ForegroundColor Yellow
 & $createCommand[0] $createCommand[1..($createCommand.Length-1)]
 
 if ($LASTEXITCODE -eq 0) {

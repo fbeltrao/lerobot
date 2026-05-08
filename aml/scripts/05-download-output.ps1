@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 # Download Azure ML Job Outputs using AzCopy
 # Simple script to download checkpoint from job
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 # Check if Azure CLI is available
 try {
     $az_version = az version 2>$null

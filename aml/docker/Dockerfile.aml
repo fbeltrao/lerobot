@@ -1,6 +1,9 @@
 # Configure the base image
-ARG PYTHON_VERSION=3.10
+# To test locally
+# From repository root: `docker build -t lerobot-aml:local -f aml/docker/Dockerfile.aml .`
+ARG PYTHON_VERSION=3.12
 FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu22.04@sha256:9585fe533ab5f5231b1d63ad660e6e5fc63aa02191181d7c30cf814a693dd11a
+ARG PYTHON_VERSION
 
 # Configure environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -24,11 +27,11 @@ WORKDIR /lerobot
 # We use a virtual environment inside the container—even though the container itself \
 # provides isolation—to closely resemble local development and allow users to \
 # run other Python projects in the same container without dependency conflicts.
-RUN uv venv --python 3.10
+RUN uv venv --python ${PYTHON_VERSION}
 ENV VIRTUAL_ENV=/lerobot/.venv
 
 # Install Python dependencies for caching
-COPY pyproject.toml README.md MANIFEST.in ./
+COPY pyproject.toml README.md MANIFEST.in setup.py ./
 COPY src/ src/
 RUN uv pip install --no-cache ".[all]" azureml-mlflow
 
