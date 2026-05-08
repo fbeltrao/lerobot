@@ -8,6 +8,7 @@ through to the original training script.
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -130,10 +131,14 @@ class MLflowLogger:
 def setup_mlflow_logger():
     """Replace WandBLogger with MLflowLogger."""
     # Import here to avoid circular imports
-    import lerobot.rl.wandb_utils
+    import lerobot.common.wandb_utils
 
     # Replace the WandBLogger class with MLflowLogger
-    lerobot.rl.wandb_utils.WandBLogger = MLflowLogger
+    lerobot.common.wandb_utils.WandBLogger = MLflowLogger
+
+    train_module = sys.modules.get("lerobot.scripts.lerobot_train")
+    if train_module is not None:
+        train_module.WandBLogger = MLflowLogger
 
     logging.info("WandBLogger replaced with MLflowLogger for MLflow logging")
 
