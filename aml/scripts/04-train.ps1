@@ -18,7 +18,7 @@ try {
 }
 
 # Parse extra arguments to detect policy type
-$policyType = $null
+$policyType = "act"
 $filteredArguments = @()
 
 for ($i = 0; $i -lt $ExtraArguments.Count; $i++) {
@@ -52,7 +52,11 @@ if ($policyType) {
 }
 
 # Build the command with the determined YAML file
-$command = @("ml", "job", "create", "-f", $yamlFile)
+$modelDatastore = if ($env:MODEL_DATA_STORE) { $env:MODEL_DATA_STORE } else { "workspaceblobstore" }
+$year = Get-Date -Format "yyyy"
+$month = Get-Date -Format "MM"
+$outputPath = "azureml://datastores/$modelDatastore/paths/checkpoints/$policyType/$year/$month/`${{name}}"
+$command = @("ml", "job", "create", "-f", $yamlFile, "--set", "outputs.checkpoint.path=$outputPath")
 
 # Add any remaining extra arguments
 if ($filteredArguments) {

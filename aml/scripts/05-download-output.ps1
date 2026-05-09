@@ -139,8 +139,14 @@ try {
         $blobPath = "azureml/$JobName/$OutputName"
     }
     
-    # For checkpoint outputs without explicit path, construct the standard path
-    if (-not $blobPath -or $OutputName -eq "checkpoint") {
+    # Resolve AML job-name placeholders when the job metadata preserves the template path.
+    if ($blobPath) {
+        $blobPath = $blobPath.Replace('${{name}}', $JobName)
+        $blobPath = $blobPath.Replace('${name}', $JobName)
+    }
+
+    # Fallback only when the output has no explicit path.
+    if (-not $blobPath) {
         $blobPath = "azureml/$JobName/$OutputName"
     }
     
@@ -181,7 +187,7 @@ try {
     }
     
     # Build source URL
-    $sourceUrl = "https://$storageAccount.blob.core.windows.net/$containerName/$blobPath/*"
+    $sourceUrl = "https://$storageAccount.blob.core.windows.net/$containerName/$blobPath"
     
     Write-Host "Source: $sourceUrl" -ForegroundColor Gray
     Write-Host "Destination: $downloadPath" -ForegroundColor Gray
