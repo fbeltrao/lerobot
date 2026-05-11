@@ -1,0 +1,5 @@
+NAMESPACE = "/lerobot"
+ACTION_TOPIC = f"{NAMESPACE}/action"
+OBSERVATION_TOPIC = f"{NAMESPACE}/observation"
+CAMERA_TOPIC_TEMPLATE = f"{NAMESPACE}/cameras/{{camera_name}}/image_raw"
+JOINT_STATES_TOPIC = "/joint_states"

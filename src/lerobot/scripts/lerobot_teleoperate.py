@@ -166,14 +166,12 @@ def teleop_loop(
         if robot.name == "unitree_g1":
             teleop.send_feedback(obs)
 
-        # Get teleop action
-        raw_action = teleop.get_action()
-
-        # Process teleop action through pipeline
-        teleop_action = teleop_action_processor((raw_action, obs))
-
-        # Process action for robot through pipeline
-        robot_action_to_send = robot_action_processor((teleop_action, obs))
+        teleop_action, robot_action_to_send = _process_teleop_action(
+            teleop=teleop,
+            obs=obs,
+            teleop_action_processor=teleop_action_processor,
+            robot_action_processor=robot_action_processor,
+        )
 
         # Send processed action to robot (robot_action_processor.to_output should return RobotAction)
         _ = robot.send_action(robot_action_to_send)
@@ -203,6 +201,32 @@ def teleop_loop(
 
         if duration is not None and time.perf_counter() - start >= duration:
             return
+
+
+def get_processed_teleop_action(
+    teleop: Teleoperator,
+    obs: RobotObservation,
+    teleop_action_processor: RobotProcessorPipeline[tuple[RobotAction, RobotObservation], RobotAction],
+    robot_action_processor: RobotProcessorPipeline[tuple[RobotAction, RobotObservation], RobotAction],
+) -> RobotAction:
+    _, robot_action = _process_teleop_action(
+        teleop=teleop,
+        obs=obs,
+        teleop_action_processor=teleop_action_processor,
+        robot_action_processor=robot_action_processor,
+    )
+    return robot_action
+
+
+def _process_teleop_action(
+    teleop: Teleoperator,
+    obs: RobotObservation,
+    teleop_action_processor: RobotProcessorPipeline[tuple[RobotAction, RobotObservation], RobotAction],
+    robot_action_processor: RobotProcessorPipeline[tuple[RobotAction, RobotObservation], RobotAction],
+) -> tuple[RobotAction, RobotAction]:
+    raw_action = teleop.get_action()
+    teleop_action = teleop_action_processor((raw_action, obs))
+    return teleop_action, robot_action_processor((teleop_action, obs))
 
 
 @parser.wrap()
