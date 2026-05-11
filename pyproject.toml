@@ -290,10 +290,12 @@ lerobot-imgtransform-viz="lerobot.scripts.lerobot_imgtransform_viz:main"
 lerobot-edit-dataset="lerobot.scripts.lerobot_edit_dataset:main"
 lerobot-setup-can="lerobot.scripts.lerobot_setup_can:main"
 lerobot-rollout="lerobot.scripts.lerobot_rollout:main"
+lerobot-pre-record-setup-match="lerobot.scripts.lerobot_pre_record_setup_match:main"
+lerobot-pre-record-setup-match-web="lerobot.setup_matching.web_app:main"
 
 # ---------------- Tool Configurations ----------------
 [tool.setuptools.package-data]
-lerobot = ["envs/*.json"]
+lerobot = ["envs/*.json", "setup_matching/static/*"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

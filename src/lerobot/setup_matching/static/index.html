@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pre-Record Setup Match</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <div>
+          <h1>Pre-Record Setup Match</h1>
+          <p id="lineage">Reference episode 0, replay episode 0, side camera</p>
+        </div>
+        <div class="status-strip">
+          <span id="readyBadge" class="badge neutral">Idle</span>
+          <span id="scoreBadge" class="badge">Score --</span>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="panel control-panel">
+          <h2>Dataset Review</h2>
+          <label>Failed episodes dataset
+            <input id="failedDataset" type="text" />
+          </label>
+          <label>Mock robot replay dataset
+            <input id="replayDataset" type="text" />
+          </label>
+          <label>SO-101 URDF path
+            <input id="urdfPath" type="text" placeholder="/path/to/SO101/so101_new_calib.urdf" />
+          </label>
+          <div class="grid two">
+            <label>Camera
+              <select id="cameraKey"></select>
+            </label>
+            <label>Artifact root
+              <input id="artifactRoot" type="text" disabled />
+            </label>
+          </div>
+          <div class="grid three">
+            <label>Reference episode
+              <input id="referenceEpisode" type="number" min="0" value="0" />
+            </label>
+            <label>Reference frame
+              <input id="referenceFrame" type="number" min="0" value="0" />
+            </label>
+            <label>Replay episode
+              <input id="replayEpisode" type="number" min="0" value="0" />
+            </label>
+          </div>
+          <div class="review-row">
+            <select id="reviewStatus">
+              <option value="failed">Failed</option>
+              <option value="good">Good</option>
+              <option value="skipped">Skipped</option>
+              <option value="unreviewed">Unreviewed</option>
+            </select>
+            <select id="failureCategory"></select>
+            <button id="saveReview" type="button">Save Review</button>
+          </div>
+          <textarea id="reviewNote" rows="3" placeholder="Failure note"></textarea>
+
+          <h2>Object ROIs</h2>
+          <div class="roi-tools">
+            <input id="objectLabel" type="text" value="green_block" />
+            <button id="addObject" type="button">Add ROI</button>
+            <button id="refineObject" type="button">Refine</button>
+          </div>
+          <div id="objectsList" class="object-list"></div>
+          <div class="actions">
+            <button id="loadFrames" type="button">Load Frames</button>
+            <button id="startStream" type="button" class="primary">Start Stream</button>
+            <button id="saveMatch" type="button">Save Match</button>
+          </div>
+        </aside>
+
+        <section class="viewer-grid">
+          <div class="viewer-panel overlay-panel">
+            <div class="viewer-heading">
+              <div>
+                <h2>Setup Overlay</h2>
+                <span id="referenceMeta">Reference episode 0, frame 0</span>
+                <span id="streamMeta">Replay episode 0, frame 0</span>
+              </div>
+              <label class="opacity-control">Replay opacity
+                <input id="overlayOpacity" type="range" min="0" max="1" step="0.05" value="0.55" />
+              </label>
+            </div>
+            <canvas id="overlayCanvas" width="640" height="480"></canvas>
+          </div>
+          <div class="panel results-panel">
+            <h2>Object Guidance</h2>
+            <div id="guidanceList" class="guidance-list"></div>
+          </div>
+          <div class="panel results-panel">
+            <h2>Warnings</h2>
+            <div id="warningsList" class="warnings-list"></div>
+          </div>
+          <div class="panel results-panel joint-panel">
+            <h2>Joint Position Comparison</h2>
+            <div id="jointList" class="joint-list"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

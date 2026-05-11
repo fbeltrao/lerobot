@@ -178,3 +178,6 @@ outputs/
 *.part
 
 mlruns/
+
+# Copilot tracking data
+.copilot-tracking/
